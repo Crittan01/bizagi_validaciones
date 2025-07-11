@@ -61,7 +61,7 @@
             task_id: "0.1"
             task_description: "Conectividad DataPower Bus Services"
             execution_time: "{{ ansible_date_time.iso8601 }}"
-            target: "192.168.20.85:22,6443"
+            target: "192.168.20.85:22"
             total_hosts: "{{ groups['servers_prod'] | length }}"
             results: |
               [
