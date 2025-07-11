@@ -57,9 +57,12 @@
     - name: "Acumular resultados en stats globales"
       ansible.builtin.set_stats:
         data:
-          bizagi_task_results: "{{ bizagi_task_results | default([]) + [task_result_item] }}"
-        aggregate: false
+          bizagi_task_results: "{{ current_results + [task_result_item] }}"
+        aggregate: true
       vars:
+        current_results:
+          "{{ bizagi_task_results | default([]) | selectattr('source_host', 'ne', inventory_hostname)
+          | selectattr('task_id', 'ne', connectivity_result.task_id) | list }}"
         task_result_item:
           task_id: "{{ connectivity_result.task_id }}"
           task_description: "Conectividad DataPower Bus Services"
@@ -69,5 +72,6 @@
           results: "{{ connectivity_result.results }}"
           target_hosts: ["192.168.20.85"]
           target_ports: [22]
+          execution_id: "{{ connectivity_result.task_id }}_{{ inventory_hostname }}_{{ ansible_date_time.epoch }}"
       delegate_to: localhost
       run_once: false
