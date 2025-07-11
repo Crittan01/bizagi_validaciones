@@ -5,6 +5,13 @@
   hosts: servers_prod
   gather_facts: false
 
+  vars:
+    # variables a nivel playbook
+    task_targets: ["192.168.20.85", "192.168.20.205"]
+    task_ports: [22, 6443]
+    task_id: "0.2"
+    task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
+
   pre_tasks:
     - name: Recuperar Facts
       ansible.builtin.setup:
@@ -32,15 +39,15 @@
               status: "unreachable"
 
   tasks:
-    - name: "Ejecutar Tarea 0.2 - Revisar conectividad con servicios del Bus a través del Datapower"
+    - name: "Ejecutar Tarea 0.2 - {{ task_description }}"
       ansible.builtin.include_role:
         name: connectivity_check
       vars:
-        connectivity_check_check_type: "telnet"
-        connectivity_check_target_hosts: ["192.168.20.85", "192.168.20.205"]
-        connectivity_check_ports: [22, 6443]
-        connectivity_check_task_id: "0.2"
-        connectivity_check_task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
+        connectivity_check_check_type: "telnet bidireccional"
+        connectivity_check_target_hosts: "{{ task_targets }}"
+        connectivity_check_ports: "{{ task_ports }}"
+        connectivity_check_task_id: "{{ task_id }}"
+        connectivity_check_task_description: "{{ task_description }}"
         connectivity_check_show_details: true
       when: facts_generated is defined
 
@@ -52,3 +59,27 @@
           - Host: {{ connectivity_result.source_host }}
           - Status: {{ connectivity_result.status }}
           - Results: {{ connectivity_result.results }}
+
+#  post_tasks:
+#    - name: "Registrar resultados globales en AWX"
+#      ansible.builtin.set_stats:
+#        data:
+#          bizagi_task_02_summary:
+#            task_id: "0.2"
+#            task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
+#            execution_time: "{{ ansible_date_time.iso8601 }}"
+#            target: "192.168.20.85,192.168.20.205:22,6443"
+#            total_hosts: "{{ groups['servers_prod'] | length }}"
+#            results: |
+#              [
+#              {% for host in groups['servers_prod'] %}
+#                {
+#                  "host": "{{ host }}",
+#                  "status": "{{ hostvars[host]['connectivity_result']['status'] }}",
+#                  "details": {{ hostvars[host]['connectivity_result']['results'] | to_json }}
+#                }{% if not loop.last %},{% endif %}
+#              {% endfor %}
+#              ]
+#        per_host: false
+#      run_once: true
+#      delegate_to: localhost
