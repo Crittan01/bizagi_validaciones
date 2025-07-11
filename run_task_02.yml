@@ -68,6 +68,6 @@
           start_time: "{{ connectivity_result.start_time }}"
           results: "{{ connectivity_result.results }}"
           target_hosts: ["192.168.20.85", "192.168.20.205"]
-          target_ports: [80]
+          target_ports: [22, 6443]
       delegate_to: localhost
       run_once: false
