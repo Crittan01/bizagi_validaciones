@@ -1,7 +1,7 @@
 ---
 # run_task_02.yml
 # Tarea 0.2
-- name: "Tarea 0.1 Bizagi"
+- name: "Tarea 0.2 Bizagi"
   hosts: servers_prod
   gather_facts: false
 
@@ -26,13 +26,13 @@
           ansible.builtin.set_fact:
             connectivity_result:
               start_time: "{{ ansible_date_time.date | default('N/A') }} - {{ ansible_date_time.time | default('N/A') }}"
-              task_id: "0.1"
+              task_id: "0.2"
               source_host: "{{ inventory_hostname }}"
               results: ["{{ inventory_hostname }} = UNREACHABLE"]
               status: "unreachable"
 
   tasks:
-    - name: "Ejecutar Tarea 0.1 - DataPower Connectivity"
+    - name: "Ejecutar Tarea 0.2 - Revisar conectividad con servicios del Bus a través del Datapower"
       ansible.builtin.include_role:
         name: connectivity_check
       vars:
@@ -40,7 +40,7 @@
         connectivity_check_target_hosts: ["192.168.20.85", "192.168.20.205"]
         connectivity_check_ports: [22, 6443]
         connectivity_check_task_id: "0.1"
-        connectivity_check_task_description: "Conectividad DataPower Bus Services"
+        connectivity_check_task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
         connectivity_check_show_details: true
       when: facts_generated is defined
 
