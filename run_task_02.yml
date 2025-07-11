@@ -58,7 +58,7 @@
       ansible.builtin.set_stats:
         data:
           bizagi_task_results: "{{ bizagi_task_results | default([]) + [task_result_item] }}"
-        aggregate: true
+        aggregate: false
       vars:
         task_result_item:
           task_id: "{{ connectivity_result.task_id }}"
