@@ -2,7 +2,7 @@
 # run_task_01.yml
 # Tarea 0.1
 - name: "Tarea 0.1 Bizagi"
-  hosts: servers_prod
+  hosts: servers_prod_01
   gather_facts: false
 
   vars:
