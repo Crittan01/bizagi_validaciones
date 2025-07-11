@@ -1,0 +1,73 @@
+---
+# run_task_02.yml
+# Tarea 0.2
+- name: "Tarea 0.1 Bizagi"
+  hosts: servers_prod
+  gather_facts: false
+
+  pre_tasks:
+    - name: Recuperar Facts
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: fact_result
+      retries: 3
+      delay: 5
+      until: not fact_result.unreachable | default(false)
+
+    - name: Establecer estado de los Facts
+      ansible.builtin.set_fact:
+        facts_generated: true
+      when: ansible_os_family is defined
+
+    - name: Crear resultado si es No alcanzable
+      when: facts_generated is not defined
+      block:
+        - name: Registrar error de recoleccion de Facts
+          ansible.builtin.set_fact:
+            connectivity_result:
+              start_time: "{{ ansible_date_time.date | default('N/A') }} - {{ ansible_date_time.time | default('N/A') }}"
+              task_id: "0.1"
+              source_host: "{{ inventory_hostname }}"
+              results: ["{{ inventory_hostname }} = UNREACHABLE"]
+              status: "unreachable"
+
+  tasks:
+    - name: "Ejecutar Tarea 0.1 - DataPower Connectivity"
+      ansible.builtin.include_role:
+        name: connectivity_check
+      vars:
+        connectivity_check_check_type: "telnet"
+        connectivity_check_target_hosts: ["192.168.20.85", "192.168.20.205"]
+        connectivity_check_ports: [22, 6443]
+        connectivity_check_task_id: "0.1"
+        connectivity_check_task_description: "Conectividad DataPower Bus Services"
+        connectivity_check_show_details: true
+      when: facts_generated is defined
+
+    - name: Mostrar resultado
+      ansible.builtin.debug:
+        msg: |
+          Tarea {{ connectivity_result.task_id }} completada:
+          - Hora: {{ connectivity_result.start_time }}
+          - Host: {{ connectivity_result.source_host }}
+          - Status: {{ connectivity_result.status }}
+          - Results: {{ connectivity_result.results }}
+
+  post_tasks:
+    - name: "Acumular resultados en stats globales"
+      ansible.builtin.set_stats:
+        data:
+          bizagi_task_results: "{{ bizagi_task_results | default([]) + [task_result_item] }}"
+        aggregate: true
+      vars:
+        task_result_item:
+          task_id: "{{ connectivity_result.task_id }}"
+          task_description: "Conectividad DataPower Bidireccional"
+          source_host: "{{ connectivity_result.source_host }}"
+          status: "{{ connectivity_result.status }}"
+          start_time: "{{ connectivity_result.start_time }}"
+          results: "{{ connectivity_result.results }}"
+          target_hosts: ["90.5.4.230", "10.8.32.10"]
+          target_ports: [80]
+      delegate_to: localhost
+      run_once: false

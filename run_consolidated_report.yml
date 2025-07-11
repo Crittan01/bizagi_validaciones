@@ -1,0 +1,93 @@
+---
+# run_consolidated_report.yml
+# Generar reporte consolidado de todas las tareas ejecutadas
+
+- name: "Reporte Consolidado Bizagi - Todas las Tareas"
+  hosts: localhost
+  gather_facts: true
+
+  tasks:
+    - name: "Mostrar stats acumulados (DEBUG)"
+      ansible.builtin.debug:
+        var: bizagi_task_results
+      when: bizagi_task_results is defined
+
+    - name: "Validar que existan resultados"
+      ansible.builtin.fail:
+        msg: "No hay resultados acumulados. Ejecute primero las tareas 0.1 y 0.2"
+      when: bizagi_task_results is not defined or bizagi_task_results | length == 0
+
+    - name: "📋 REPORTE CONSOLIDADO BIZAGI - TODAS LAS TAREAS"
+      ansible.builtin.debug:
+        msg: |
+          ================================================================
+                          REPORTE CONSOLIDADO BIZAGI
+                            PRE-ALISTAMIENTO SISTEMA
+          ================================================================
+          Fecha Reporte: {{ ansible_date_time.iso8601 }}
+          Total Resultados: {{ bizagi_task_results | length }}
+
+          RESULTADOS POR TAREA Y HOST:
+          {% for result in bizagi_task_results %}
+          ──────────────────────────────────────────────────────────────
+          📋 TAREA: {{ result.task_id }} - {{ result.task_description }}
+          🖥️  HOST: {{ result.source_host }}
+          📊 STATUS: {{ result.status | upper }}
+            HORA: {{ result.start_time }}
+          🎯 DESTINOS: {{ result.target_hosts | join(', ') }}:{{ result.target_ports | join(',') }}
+          📋 DETALLES:
+          {% for detail in result.results %}
+          {{ detail }}
+          {% endfor %}
+          {% endfor %}
+          ──────────────────────────────────────────────────────────────
+
+          📊 RESUMEN EJECUTIVO:
+          {% set total_tests = bizagi_task_results | length %}
+          {% set successful = bizagi_task_results | selectattr('status', 'equalto', 'success') | list | length %}
+          {% set failed = bizagi_task_results | selectattr('status', 'equalto', 'failed') | list | length %}
+          {% set unreachable = bizagi_task_results | selectattr('status', 'equalto', 'unreachable') | list | length %}
+
+          📈 TOTAL TESTS: {{ total_tests }}
+          ✅ EXITOSOS: {{ successful }} ({{ ((successful / total_tests) * 100) | round(1) }}%)
+            FALLIDOS: {{ failed }} ({{ ((failed / total_tests) * 100) | round(1) }}%)
+          🔌 NO ALCANZABLES: {{ unreachable }} ({{ ((unreachable / total_tests) * 100) | round(1) }}%)
+
+          🎯 ESTADO GENERAL: {% if failed > 0 or unreachable > 0 %} ATENCIÓN REQUERIDA{% else %}✅TODOS EXITOSOS{% endif %}
+          ================================================================
+
+    - name: "Generar archivo JSON consolidado"
+      ansible.builtin.copy:
+        content: |
+          {
+            "report_type": "bizagi_consolidated_report",
+            "execution_timestamp": "{{ ansible_date_time.iso8601 }}",
+            "total_results": {{ bizagi_task_results | length }},
+            "tasks_executed": [
+          {% set task_ids = bizagi_task_results | map(attribute='task_id') | unique | list %}
+          {% for task_id in task_ids %}
+              "{{ task_id }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+            ],
+            "detailed_results": {{ bizagi_task_results | to_nice_json }},
+            "summary": {
+              "total_tests": {{ bizagi_task_results | length }},
+              "successful": {{ bizagi_task_results | selectattr('status', 'equalto', 'success')
+                | list | length }},
+              "failed": {{ bizagi_task_results | selectattr('status', 'equalto', 'failed')
+                | list | length }},
+              "unreachable": {{ bizagi_task_results | selectattr('status', 'equalto', 'unreachable')
+                | list | length }},
+              "success_rate": {{ ((bizagi_task_results | selectattr('status', 'equalto', 'success')
+                | list | length / bizagi_task_results | length) * 100) | round(2) }}
+            }
+          }
+        dest: "./reports/bizagi_consolidated_{{ ansible_date_time.epoch }}.json"
+        mode: "0644"
+
+    - name: "Limpiar stats después del reporte (opcional)"
+      ansible.builtin.set_stats:
+        data:
+          bizagi_task_results: []
+        aggregate: false
+      when: clear_stats_after_report | default(false)
