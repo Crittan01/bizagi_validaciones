@@ -71,3 +71,15 @@
       source_host: "{{ inventory_hostname }}"
       results: "{{ connectivity_test.stdout_lines }}"
       status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
+
+- name: "Registrar resultado en stats globales de AWX"
+  ansible.builtin.set_stats:
+    data:
+      bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}_{{ inventory_hostname }}:
+        task_id: "{{ connectivity_check_task_id }}"
+        host: "{{ inventory_hostname }}"
+        status: "{{ connectivity_result.status }}"
+        timestamp: "{{ ansible_date_time.iso8601 }}"
+        details: "{{ connectivity_result.results }}"
+        target: "{{ connectivity_check_target_hosts | join(',') }}:{{ connectivity_check_ports | join(',') }}"
+    per_host: false

@@ -54,20 +54,25 @@
           - Results: {{ connectivity_result.results }}
 
   post_tasks:
-    - name: "Acumular resultados en stats globales"
+    - name: "Registrar resultados globales en AWX"
       ansible.builtin.set_stats:
         data:
-          bizagi_task_results: "{{ bizagi_task_results | default([]) + [task_result_item] }}"
-        aggregate: true
-      vars:
-        task_result_item:
-          task_id: "{{ connectivity_result.task_id }}"
-          task_description: "Conectividad DataPower Bus Services"
-          source_host: "{{ connectivity_result.source_host }}"
-          status: "{{ connectivity_result.status }}"
-          start_time: "{{ connectivity_result.start_time }}"
-          results: "{{ connectivity_result.results }}"
-          target_hosts: ["192.168.20.85"]
-          target_ports: [22]
+          bizagi_task_01_summary:
+            task_id: "0.1"
+            task_description: "Conectividad DataPower Bus Services"
+            execution_time: "{{ ansible_date_time.iso8601 }}"
+            target: "192.168.20.85:22,6443"
+            total_hosts: "{{ groups['servers_prod'] | length }}"
+            results: |
+              [
+              {% for host in groups['servers_prod'] %}
+                {
+                  "host": "{{ host }}",
+                  "status": "{{ hostvars[host]['connectivity_result']['status'] }}",
+                  "details": {{ hostvars[host]['connectivity_result']['results'] | to_json }}
+                }{% if not loop.last %},{% endif %}
+              {% endfor %}
+              ]
+        per_host: false
+      run_once: true
       delegate_to: localhost
-      run_once: false
