@@ -67,7 +67,7 @@
           status: "{{ connectivity_result.status }}"
           start_time: "{{ connectivity_result.start_time }}"
           results: "{{ connectivity_result.results }}"
-          target_hosts: ["90.5.4.230", "10.8.32.10"]
+          target_hosts: "{{ connectivity_check_target_hosts }}"
           target_ports: [80]
       delegate_to: localhost
       run_once: false
