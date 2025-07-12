@@ -74,34 +74,30 @@
 
 # En roles/connectivity_check/tasks/main.yml - FINAL
 
-- name: "Registrar resultado en estructura jerárquica"
+- name: "Crear resultado del host actual"
+  ansible.builtin.set_fact:
+    host_result:
+      status: "{{ connectivity_result.status }}"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      details: "{{ connectivity_result.results }}"
+
+- name: "Agregar host a resultados de la task"
   ansible.builtin.set_stats:
     data:
-      bizagi_results: |
-        {%- set current_results = bizagi_results | default({}) -%}
-        {%- set task_key = 'task_' + connectivity_check_task_id | replace('.', '_') -%}
-
-        {%- if task_key not in current_results -%}
-          {%- set _ = current_results.update({
-            task_key: {
-              'task_info': {
-                'task_id': connectivity_check_task_id,
-                'description': connectivity_check_task_description,
-                'target': (connectivity_check_target_hosts | join(',')) + ':' + (connectivity_check_ports | join(',')),
-                'execution_time': ansible_date_time.iso8601
-              },
-              'hosts': {}
-            }
-          }) -%}
-        {%- endif -%}
-
-        {%- set _ = current_results[task_key]['hosts'].update({
-          inventory_hostname: {
-            'status': connectivity_result.status,
-            'timestamp': ansible_date_time.iso8601,
-            'details': connectivity_result.results
-          }
-        }) -%}
-
-        {{ current_results }}
+      "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}": "{{
+        current_task_data | combine({
+        'hosts': current_task_data.hosts | default({}) | combine({
+        inventory_hostname: host_result
+        })
+        }) }}"
     per_host: false
+  vars:
+    task_key: "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}"
+    current_task_data: "{{ vars[task_key] | default({
+      'task_info': {
+      'task_id': connectivity_check_task_id,
+      'description': connectivity_check_task_description,
+      'target': (connectivity_check_target_hosts | join(',')) + ':' + (connectivity_check_ports | join(',')),
+      'execution_time': ansible_date_time.iso8601
+      },
+      'hosts': {} }) }}"
