@@ -13,7 +13,7 @@
     task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
 
   pre_tasks:
-    - name: Recuperar Facts
+    - name: "Recuperar Facts"
       ansible.builtin.setup:
       ignore_unreachable: true
       register: fact_result
@@ -21,15 +21,15 @@
       delay: 5
       until: not fact_result.unreachable | default(false)
 
-    - name: Establecer estado de los Facts
+    - name: "Establecer estado de los Facts"
       ansible.builtin.set_fact:
         facts_generated: true
       when: ansible_os_family is defined
 
-    - name: Crear resultado si es No alcanzable
+    - name: "Crear resultado si es No alcanzable"
       when: facts_generated is not defined
       block:
-        - name: Registrar error de recoleccion de Facts
+        - name: "Registrar error de recoleccion de Facts"
           ansible.builtin.set_fact:
             connectivity_result:
               start_time: "{{ ansible_date_time.date | default('N/A') }} - {{ ansible_date_time.time | default('N/A') }}"
@@ -51,7 +51,7 @@
         connectivity_check_show_details: true
       when: facts_generated is defined
 
-    - name: Mostrar resultado
+    - name: "Mostrar resultado"
       ansible.builtin.debug:
         msg: |
           Tarea {{ connectivity_result.task_id }} completada:

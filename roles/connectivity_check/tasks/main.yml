@@ -1,6 +1,6 @@
 ---
 # tasks file for roles/connectivity_check
-- name: (FAIL) - Validar parámetros requeridos
+- name: "(FAIL) - Validar parámetros requeridos"
   ansible.builtin.fail:
     msg: "Parámetro requerido faltante: {{ item }}"
   when: vars[item] is not defined or vars[item] | length == 0
@@ -8,13 +8,13 @@
     - connectivity_check_target_hosts
     - connectivity_check_check_type
 
-- name: (FAIL) - Validar puertos para telnet
+- name: "(FAIL) - Validar puertos para telnet"
   ansible.builtin.fail:
     msg: "Puertos requeridos para check_type telnet"
   when: connectivity_check_check_type in ['telnet', 'telnet_bidirectional']
     and (connectivity_check_ports is not defined or connectivity_check_ports | length == 0)
 
-- name: Mostrar configuración de la prueba
+- name: "Mostrar configuración de la prueba"
   ansible.builtin.debug:
     msg: |
       ====================================
@@ -26,7 +26,7 @@
       Puertos: {{ connectivity_check_ports | default(['N/A']) | join(', ') }}
       ====================================
 
-- name: Ejecutar test de conectividad
+- name: "Ejecutar test de conectividad"
   block:
     - name: Test conectividad con Test-NetConnection
       ansible.windows.win_shell: |
@@ -47,7 +47,7 @@
       changed_when: false
 
   rescue:
-    - name: Manejar error (WinRM, PowerShell, etc.)
+    - name: "Manejar error (WinRM, PowerShell, etc.)"
       ansible.builtin.set_fact:
         connectivity_test:
           stdout_lines:
@@ -56,14 +56,14 @@
             ]
           stdout: "SYSTEM_ERROR"
 
-    - name: Mostrar error capturado
+    - name: "Mostrar error capturado"
       ansible.builtin.debug:
         msg: |
           ERROR TÉCNICO CAPTURADO:
           {{ ansible_failed_result.msg | default('Error desconocido') }}
           El test no pudo ejecutarse por problemas.
 
-- name: Crear resultado
+- name: "Crear resultado"
   ansible.builtin.set_fact:
     connectivity_result:
       start_time: "{{ ansible_date_time.date }} - {{ ansible_date_time.time }}"
