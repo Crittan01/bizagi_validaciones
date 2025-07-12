@@ -81,7 +81,7 @@
 
 - name: "Preparar datos de la task"
   ansible.builtin.set_fact:
-    task_key: "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}"
+    task_key: "bizagi_task_{{ connectivity_check_task_id }}"
     task_info:
       task_id: "{{ connectivity_check_task_id }}"
       description: "{{ connectivity_check_task_description }}"

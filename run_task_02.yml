@@ -9,7 +9,7 @@
     # variables a nivel playbook
     task_targets: ["192.168.20.85", "192.168.20.205"]
     task_ports: [22, 6443]
-    task_id: "0.2"
+    task_id: "0_2"
     task_description: "Revisar conectividad con servicios del Bus a través del Datapower"
 
   pre_tasks:
