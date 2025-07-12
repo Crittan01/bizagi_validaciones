@@ -28,7 +28,7 @@
 
 - name: "Ejecutar test de conectividad"
   block:
-    - name: Test conectividad con Test-NetConnection
+    - name: "Test conectividad con Test-NetConnection"
       ansible.windows.win_shell: |
         {% for host in connectivity_check_target_hosts %}
         {% for port in connectivity_check_ports %}
