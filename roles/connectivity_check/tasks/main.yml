@@ -74,34 +74,14 @@
 
 # En roles/connectivity_check/tasks/main.yml - FINAL
 
-- name: "Registrar resultado en estructura jerárquica"
+- name: "Registrar resultado en stats globales de AWX"
   ansible.builtin.set_stats:
     data:
-      bizagi_results: |
-        {%- set current_results = bizagi_results | default({}) -%}
-        {%- set task_key = 'task_' + connectivity_check_task_id | replace('.', '_') -%}
-
-        {%- if task_key not in current_results -%}
-          {%- set _ = current_results.update({
-            task_key: {
-              'task_info': {
-                'task_id': connectivity_check_task_id,
-                'description': connectivity_check_task_description,
-                'target': (connectivity_check_target_hosts | join(',')) + ':' + (connectivity_check_ports | join(',')),
-                'execution_time': ansible_date_time.iso8601
-              },
-              'hosts': {}
-            }
-          }) -%}
-        {%- endif -%}
-
-        {%- set _ = current_results[task_key]['hosts'].update({
-          inventory_hostname: {
-            'status': connectivity_result.status,
-            'timestamp': ansible_date_time.iso8601,
-            'details': connectivity_result.results
-          }
-        }) -%}
-
-        {{ current_results }}
+      "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}_{{ inventory_hostname }}":
+        task_id: "{{ connectivity_check_task_id }}"
+        host: "{{ inventory_hostname }}"
+        status: "{{ connectivity_result.status }}"
+        timestamp: "{{ ansible_date_time.iso8601 }}"
+        details: "{{ connectivity_result.results }}"
+        target: "{{ connectivity_check_target_hosts | join(',') }}:{{ connectivity_check_ports | join(',') }}"
     per_host: false
