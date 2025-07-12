@@ -63,30 +63,30 @@
           {{ ansible_failed_result.msg | default('Error desconocido') }}
           El test no pudo ejecutarse por problemas.
 
-- name: "Registrar en stats globales de AWX"
-  ansible.builtin.set_stats:
-    data:
-      "bizagi_task_{{ connectivity_check_task_id }}": "{{ current_task_data | combine({'hosts': updated_hosts}) }}"
-    per_host: false
-  vars:
-    task_key: "bizagi_task_{{ connectivity_check_task_id }}"
+- name: "Crear resultado"
+  ansible.builtin.set_fact:
+    connectivity_result:
+      start_time: "{{ ansible_date_time.date }} - {{ ansible_date_time.time }}"
+      task_id: "{{ connectivity_check_task_id }}"
+      source_host: "{{ inventory_hostname }}"
+      results: "{{ connectivity_test.stdout_lines }}"
+      status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
 
-    # Info de la task
+- name: "Crear resultado del host actual"
+  ansible.builtin.set_fact:
+    host_result:
+      status: "{{ connectivity_result.status }}"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+      details: "{{ connectivity_result.results }}"
+
+- name: "Preparar datos de la task"
+  ansible.builtin.set_fact:
+    task_key: "bizagi_task_{{ connectivity_check_task_id }}"
     task_info:
       task_id: "{{ connectivity_check_task_id }}"
       description: "{{ connectivity_check_task_description }}"
       target: "{{ connectivity_check_target_hosts | join(',') }}:{{ connectivity_check_ports | join(',') }}"
       execution_time: "{{ ansible_date_time.iso8601 }}"
-
-    # Resultado del host actual
-    host_result:
-      status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
-      timestamp: "{{ ansible_date_time.iso8601 }}"
-      details: "{{ connectivity_test.stdout_lines }}"
-
-    # Combinar todo
-    current_task_data: "{{ vars[task_key] | default({'task_info': task_info, 'hosts': {}}) }}"
-    updated_hosts: "{{ current_task_data.hosts | default({}) | combine({inventory_hostname: host_result}) }}"
 
 - name: "Agregar host a resultados de la task"
   ansible.builtin.set_stats:
