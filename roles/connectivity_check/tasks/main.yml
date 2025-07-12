@@ -63,6 +63,7 @@
           {{ ansible_failed_result.msg | default('Error desconocido') }}
           El test no pudo ejecutarse por problemas.
 
+# Procesar datos del Test
 - name: "Crear resultado"
   ansible.builtin.set_fact:
     connectivity_result:
@@ -72,6 +73,7 @@
       results: "{{ connectivity_test.stdout_lines }}"
       status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
 
+# Formatear para stats
 - name: "Crear resultado del host actual"
   ansible.builtin.set_fact:
     host_result:
@@ -79,6 +81,7 @@
       timestamp: "{{ ansible_date_time.iso8601 }}"
       details: "{{ connectivity_result.results }}"
 
+# Metadata de la task
 - name: "Preparar datos de la task"
   ansible.builtin.set_fact:
     task_key: "bizagi_task_{{ connectivity_check_task_id }}"
@@ -88,6 +91,7 @@
       target: "{{ connectivity_check_target_hosts | join(',') }}:{{ connectivity_check_ports | join(',') }}"
       execution_time: "{{ ansible_date_time.iso8601 }}"
 
+# Registrar en AWX (set_stats)
 - name: "Agregar host a resultados de la task"
   ansible.builtin.set_stats:
     data:
