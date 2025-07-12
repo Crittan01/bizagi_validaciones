@@ -72,8 +72,6 @@
       results: "{{ connectivity_test.stdout_lines }}"
       status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
 
-# En roles/connectivity_check/tasks/main.yml - FINAL
-
 - name: "Crear resultado del host actual"
   ansible.builtin.set_fact:
     host_result:
@@ -81,23 +79,20 @@
       timestamp: "{{ ansible_date_time.iso8601 }}"
       details: "{{ connectivity_result.results }}"
 
+- name: "Preparar datos de la task"
+  ansible.builtin.set_fact:
+    task_key: "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}"
+    task_info:
+      task_id: "{{ connectivity_check_task_id }}"
+      description: "{{ connectivity_check_task_description }}"
+      target: "{{ connectivity_check_target_hosts | join(',') }}:{{ connectivity_check_ports | join(',') }}"
+      execution_time: "{{ ansible_date_time.iso8601 }}"
+
 - name: "Agregar host a resultados de la task"
   ansible.builtin.set_stats:
     data:
-      "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}": "{{
-        current_task_data | combine({
-        'hosts': current_task_data.hosts | default({}) | combine({
-        inventory_hostname: host_result
-        })
-        }) }}"
+      "{{ task_key }}": "{{ current_task_data | combine({'hosts': updated_hosts}) }}"
     per_host: false
   vars:
-    task_key: "bizagi_task_{{ connectivity_check_task_id | replace('.', '_') }}"
-    current_task_data: "{{ vars[task_key] | default({
-      'task_info': {
-      'task_id': connectivity_check_task_id,
-      'description': connectivity_check_task_description,
-      'target': (connectivity_check_target_hosts | join(',')) + ':' + (connectivity_check_ports | join(',')),
-      'execution_time': ansible_date_time.iso8601
-      },
-      'hosts': {} }) }}"
+    current_task_data: "{{ vars[task_key] | default({'task_info': task_info, 'hosts': {}}) }}"
+    updated_hosts: "{{ current_task_data.hosts | default({}) | combine({inventory_hostname: host_result}) }}"
