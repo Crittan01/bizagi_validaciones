@@ -106,8 +106,10 @@
     - name: "Generar plan de sincronización"
       ansible.builtin.set_fact:
         sync_plan: |
-          {%- set prod_files = hostvars['win2016sql']['files_inventory'] | default([]) -%}
-          {%- set cont_files = hostvars['win2016_2017']['files_inventory'] | default([]) -%}
+          {%- set prod_host = groups['servers_produccion'][0] -%}
+          {%- set cont_host = groups['servers_contingencia'][0] -%}
+          {%- set prod_files = hostvars[prod_host]['files_inventory'] | default([]) -%}
+          {%- set cont_files = hostvars[cont_host]['files_inventory'] | default([]) -%}
           {%- set files_to_sync = [] -%}
           {%- set files_in_sync = [] -%}
           {%- set missing_in_cont = [] -%}
@@ -146,6 +148,8 @@
           {%- endfor -%}
 
           {{ {
+            'prod_host': prod_host,
+            'cont_host': cont_host,
             'files_to_sync': files_to_sync,
             'files_in_sync': files_in_sync,
             'missing_in_cont': missing_in_cont,
@@ -155,7 +159,7 @@
             'sync_required': (files_to_sync | length > 0) or (missing_in_cont | length > 0)
           } }}
 
-    - name: "📊 REPORTE DE ANÁLISIS - TAREA 0.3"
+    - name: "REPORTE DE ANÁLISIS - TAREA 0.3"
       ansible.builtin.debug:
         msg: |
           ================================================================
