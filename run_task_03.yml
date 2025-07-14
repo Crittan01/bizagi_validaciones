@@ -1,24 +1,142 @@
 ---
-# run_task_03.yml
-- name: "Tarea 0.3 Bizagi - Inventario"
+# run_task_03.yml - Tarea 0.3 COMPLETA con configuración de shares
+- name: "Tarea 0.3 Bizagi - Pre-configuración"
   hosts: servers_origen
   gather_facts: false
 
   vars:
     task_config:
       id: "0_3"
-      description: "Sincronizacion Scripts Prod → Contingencia"
+      description: "Crear carpeta compartida en contingencia"
       name_share: "Cont_Documentos"
-      scripts_parth: "D:\\Mis Documentos"
-      file_patterns: ["*.bat", "*.ps1"]
-      cont_share: "\\\\{{ groups['servers_cont_03'][0] }}\\Cont_Documentos"
+      scripts_path: "D:\\Mis Documentos"
+      cont_share: "\\\\{{ groups['servers_contingencia'][0] }}\\Cont_Documentos"
 
   pre_tasks:
-    - name: Configurar carpeta compartida en contingencia
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: fact_result
+
+    - name: "Establecer estado de los Facts"
+      ansible.builtin.set_fact:
+        facts_generated: true
+      when: ansible_os_family is defined
+
+  tasks:
+    - name: "Crear carpeta compartida en contingencia"
       ansible.windows.win_share:
         name: "{{ task_config.name_share }}"
-        path: "{{ task_config.scripts_parth }}"
+        path: "{{ task_config.scripts_path }}"
         list: false
         full: "Administrators"
         state: present
-        description: Configurar carpeta compartida en contingencia
+        description: "{{ task_config.name_share }}"
+      register: share_creation
+      when:
+        - facts_generated is defined
+      delegate_to: win2016_2017
+
+- name: "Tarea 0.3 Bizagi - Inventario de Scripts"
+  hosts: servers_origen
+  gather_facts: false
+  serial: 1
+
+  vars:
+    task_config:
+      id: "0_3"
+      description: "Sincronizar scripts Prod → Contingencia"
+      scripts_path: "D:\\Mis Documentos"
+      file_patterns: ["*.bat", "*.ps1"]
+
+  pre_tasks:
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: fact_result
+
+    - name: "Establecer estado de los Facts"
+      ansible.builtin.set_fact:
+        facts_generated: true
+      when: ansible_os_family is defined
+
+    - name: "Crear resultado si es No alcanzable"
+      when: facts_generated is not defined
+      block:
+        - name: "Registrar error de recolección de Facts"
+          ansible.builtin.set_fact:
+            file_operations_result:
+              start_time: "{{ ansible_date_time.date | default('N/A') }} - {{ ansible_date_time.time | default('N/A') }}"
+              task_id: "0_3"
+              source_host: "{{ inventory_hostname }}"
+              files_inventory: []
+              status: "unreachable"
+
+  tasks:
+    - name: "Ejecutar Tarea 0.3 - File Operations Inventory"
+      ansible.builtin.include_role:
+        name: file_operations
+      vars:
+        file_operations_operation_type: "inventory"
+        file_operations_source_path: "{{ task_config.scripts_path }}"
+        file_operations_file_patterns: "{{ task_config.file_patterns }}"
+        file_operations_task_id: "{{ task_config.id }}"
+        file_operations_task_description: "{{ task_config.description }}"
+        file_operations_show_details: true
+      when: facts_generated is defined
+
+    - name: "Mostrar resultado del inventario"
+      ansible.builtin.debug:
+        msg: |
+          Tarea {{ file_operations_result.task_id }} completada:
+          - Hora: {{ file_operations_result.start_time }}
+          - Host: {{ file_operations_result.source_host }}
+          - Status: {{ file_operations_result.status }}
+          - Archivos: {{ file_operations_result.files_found }}
+
+- name: "Tarea 0.3 - Análisis de Sincronización"
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: "Generar plan de sincronización"
+      ansible.builtin.set_fact:
+        sync_plan: |
+          {%- set prod_files = bizagi_task_0_3.hosts.win2016sql.files_inventory -%}
+          {%- set cont_files = bizagi_task_0_3.hosts.win2016_2017.files_inventory -%}
+          {%- set files_to_sync = [] -%}
+          {%- set files_in_sync = [] -%}
+
+          {%- for prod_file in prod_files -%}
+            {%- set cont_file = cont_files | selectattr('name', 'equalto', prod_file.name) | first | default(none) -%}
+            {%- if cont_file -%}
+              {%- if prod_file.lastwritetime > cont_file.lastwritetime or prod_file.hash != cont_file.hash -%}
+                {%- set _ = files_to_sync.append(prod_file.name) -%}
+              {%- else -%}
+                {%- set _ = files_in_sync.append(prod_file.name) -%}
+              {%- endif -%}
+            {%- else -%}
+              {%- set _ = files_to_sync.append(prod_file.name) -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {{ {'files_to_sync': files_to_sync, 'files_in_sync': files_in_sync} }}
+
+    - name: "📊 REPORTE DE ANÁLISIS"
+      ansible.builtin.debug:
+        msg: |
+          ================================================================
+                         ANÁLISIS DE SINCRONIZACIÓN
+          ================================================================
+          🔄 Archivos a sincronizar: {{ sync_plan.files_to_sync | length }}
+          {% for file in sync_plan.files_to_sync %}
+          - {{ file }}
+          {% endfor %}
+
+          ✅ Archivos sincronizados: {{ sync_plan.files_in_sync | length }}
+          {% for file in sync_plan.files_in_sync %}
+          - {{ file }}
+          {% endfor %}
+
+          Acción: {% if sync_plan.files_to_sync | length > 0 %}🔄 SINCRONIZACIÓN REQUERIDA{% else %}✅ TODO SINCRONIZADO{% endif %}
+          ================================================================
