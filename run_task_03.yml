@@ -102,41 +102,99 @@
     - name: "Generar plan de sincronización"
       ansible.builtin.set_fact:
         sync_plan: |
-          {%- set prod_files = bizagi_task_0_3.hosts.win2016sql.files_inventory -%}
-          {%- set cont_files = bizagi_task_0_3.hosts.win2016_2017.files_inventory -%}
+          {%- set prod_files = hostvars['win2016sql']['files_inventory'] | default([]) -%}
+          {%- set cont_files = hostvars['win2016_2017']['files_inventory'] | default([]) -%}
           {%- set files_to_sync = [] -%}
           {%- set files_in_sync = [] -%}
+          {%- set missing_in_cont = [] -%}
+          {%- set cont_only_files = [] -%}
 
           {%- for prod_file in prod_files -%}
             {%- set cont_file = cont_files | selectattr('name', 'equalto', prod_file.name) | first | default(none) -%}
             {%- if cont_file -%}
               {%- if prod_file.lastwritetime > cont_file.lastwritetime or prod_file.hash != cont_file.hash -%}
-                {%- set _ = files_to_sync.append(prod_file.name) -%}
+                {%- set reason = 'newer' if prod_file.lastwritetime > cont_file.lastwritetime else 'different_content' -%}
+                {%- set _ = files_to_sync.append({
+                  'name': prod_file.name,
+                  'reason': reason,
+                  'prod_timestamp': prod_file.lastwritetime,
+                  'cont_timestamp': cont_file.lastwritetime,
+                  'prod_hash': prod_file.hash,
+                  'cont_hash': cont_file.hash,
+                  'size': prod_file.size
+                }) -%}
               {%- else -%}
                 {%- set _ = files_in_sync.append(prod_file.name) -%}
               {%- endif -%}
             {%- else -%}
-              {%- set _ = files_to_sync.append(prod_file.name) -%}
+              {%- set _ = missing_in_cont.append({
+                'name': prod_file.name,
+                'timestamp': prod_file.lastwritetime,
+                'size': prod_file.size
+              }) -%}
             {%- endif -%}
           {%- endfor -%}
 
-          {{ {'files_to_sync': files_to_sync, 'files_in_sync': files_in_sync} }}
+          {%- for cont_file in cont_files -%}
+            {%- if not (prod_files | selectattr('name', 'equalto', cont_file.name) | list) -%}
+              {%- set _ = cont_only_files.append(cont_file.name) -%}
+            {%- endif -%}
+          {%- endfor -%}
 
-    - name: "📊 REPORTE DE ANÁLISIS"
+          {{ {
+            'files_to_sync': files_to_sync,
+            'files_in_sync': files_in_sync,
+            'missing_in_cont': missing_in_cont,
+            'cont_only_files': cont_only_files,
+            'prod_total': prod_files | length,
+            'cont_total': cont_files | length,
+            'sync_required': (files_to_sync | length > 0) or (missing_in_cont | length > 0)
+          } }}
+
+    - name: "📊 REPORTE DE ANÁLISIS - TAREA 0.3"
       ansible.builtin.debug:
         msg: |
           ================================================================
-                         ANÁLISIS DE SINCRONIZACIÓN
+                         ANÁLISIS DE SINCRONIZACIÓN - TAREA 0.3
+                    Productivo (win2016sql) → Contingencia (win2016_2017)
           ================================================================
-          🔄 Archivos a sincronizar: {{ sync_plan.files_to_sync | length }}
+          📁 Productivo: {{ sync_plan.prod_total }} archivos
+          📁 Contingencia: {{ sync_plan.cont_total }} archivos
+
+          🔄 ARCHIVOS A ACTUALIZAR: {{ sync_plan.files_to_sync | length }}
           {% for file in sync_plan.files_to_sync %}
-          - {{ file }}
+          - {{ file.name }} ({{ file.reason }})
+            Prod: {{ file.prod_timestamp }} | Cont: {{ file.cont_timestamp }}
           {% endfor %}
 
-          ✅ Archivos sincronizados: {{ sync_plan.files_in_sync | length }}
+          ❌ ARCHIVOS FALTANTES EN CONTINGENCIA: {{ sync_plan.missing_in_cont | length }}
+          {% for file in sync_plan.missing_in_cont %}
+          - {{ file.name }} ({{ file.size }} bytes)
+          {% endfor %}
+
+          ✅ ARCHIVOS SINCRONIZADOS: {{ sync_plan.files_in_sync | length }}
           {% for file in sync_plan.files_in_sync %}
           - {{ file }}
           {% endfor %}
 
-          Acción: {% if sync_plan.files_to_sync | length > 0 %}🔄 SINCRONIZACIÓN REQUERIDA{% else %}✅ TODO SINCRONIZADO{% endif %}
+          ⚠️  ARCHIVOS SOLO EN CONTINGENCIA: {{ sync_plan.cont_only_files | length }}
+          {% for file in sync_plan.cont_only_files %}
+          - {{ file }}
+          {% endfor %}
+
+          🎯 RECOMENDACIÓN: {% if sync_plan.sync_required %}🔄 EJECUTAR SINCRONIZACIÓN{% else %}✅ NO SE REQUIERE ACCIÓN{% endif %}
           ================================================================
+
+    - name: "Registrar análisis en stats globales"
+      ansible.builtin.set_stats:
+        data:
+          bizagi_task_0_3_analysis:
+            analysis_timestamp: "{{ ansible_date_time.iso8601 }}"
+            sync_required: "{{ sync_plan.sync_required }}"
+            summary:
+              files_to_update: "{{ sync_plan.files_to_sync | length }}"
+              files_missing: "{{ sync_plan.missing_in_cont | length }}"
+              files_in_sync: "{{ sync_plan.files_in_sync | length }}"
+              cont_only_files: "{{ sync_plan.cont_only_files | length }}"
+            sync_plan: "{{ sync_plan }}"
+        per_host: false
