@@ -96,9 +96,13 @@
 
 - name: "Tarea 0.3 - Análisis de Sincronización"
   hosts: localhost
-  gather_facts: false
 
   tasks:
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+        filter: ansible_date_time
+      register: fact_result
+
     - name: "Generar plan de sincronización"
       ansible.builtin.set_fact:
         sync_plan: |
@@ -158,31 +162,31 @@
                          ANÁLISIS DE SINCRONIZACIÓN - TAREA 0.3
                     Productivo (win2016sql) → Contingencia (win2016_2017)
           ================================================================
-          📁 Productivo: {{ sync_plan.prod_total }} archivos
-          📁 Contingencia: {{ sync_plan.cont_total }} archivos
+          Productivo: {{ sync_plan.prod_total }} archivos
+          Contingencia: {{ sync_plan.cont_total }} archivos
 
-          🔄 ARCHIVOS A ACTUALIZAR: {{ sync_plan.files_to_sync | length }}
+          ARCHIVOS A ACTUALIZAR: {{ sync_plan.files_to_sync | length }}
           {% for file in sync_plan.files_to_sync %}
-          - {{ file.name }} ({{ file.reason }})
-            Prod: {{ file.prod_timestamp }} | Cont: {{ file.cont_timestamp }}
+          - Archivo: {{ file.name }} ({{ file.reason }})
+            Date Prod: {{ file.prod_timestamp }} | Date Cont: {{ file.cont_timestamp }}
           {% endfor %}
 
-          ❌ ARCHIVOS FALTANTES EN CONTINGENCIA: {{ sync_plan.missing_in_cont | length }}
+          ARCHIVOS FALTANTES EN CONTINGENCIA: {{ sync_plan.missing_in_cont | length }}
           {% for file in sync_plan.missing_in_cont %}
-          - {{ file.name }} ({{ file.size }} bytes)
+          - Archivo: {{ file.name }} ({{ file.size }} bytes)
           {% endfor %}
 
-          ✅ ARCHIVOS SINCRONIZADOS: {{ sync_plan.files_in_sync | length }}
+          ARCHIVOS SINCRONIZADOS: {{ sync_plan.files_in_sync | length }}
           {% for file in sync_plan.files_in_sync %}
-          - {{ file }}
+          - Archivo: {{ file }}
           {% endfor %}
 
-          ⚠️  ARCHIVOS SOLO EN CONTINGENCIA: {{ sync_plan.cont_only_files | length }}
+          ARCHIVOS SOLO EN CONTINGENCIA: {{ sync_plan.cont_only_files | length }}
           {% for file in sync_plan.cont_only_files %}
-          - {{ file }}
+          - Archivo: {{ file }}
           {% endfor %}
 
-          🎯 RECOMENDACIÓN: {% if sync_plan.sync_required %}🔄 EJECUTAR SINCRONIZACIÓN{% else %}✅ NO SE REQUIERE ACCIÓN{% endif %}
+          RECOMENDACIÓN: {% if sync_plan.sync_required %}🔄 EJECUTAR SINCRONIZACIÓN{% else %}✅ NO SE REQUIERE ACCIÓN{% endif %}
           ================================================================
 
     - name: "Registrar análisis en stats globales"
