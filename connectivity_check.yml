@@ -7,8 +7,8 @@
 
   vars:
     # variables a nivel playbook
-    task_targets: ["192.168.20.85"]
-    task_ports: [22]
+    task_targets: "{{ task_targets | default([]) }}"
+    task_ports: "{{ task_ports | default([]) }}"
     task_id: "0_1"
     task_description: "Conectividad DataPower Bus Services"
 
@@ -39,6 +39,10 @@
               status: "unreachable"
 
   tasks:
+    - name: "Validar si hay targets configurados"
+      ansible.builtin.debug:
+        msg: "Targets: {{ task_targets | length }} configurados"
+
     - name: "Ejecutar Tarea 0.1 - {{ task_description }}"
       ansible.builtin.include_role:
         name: connectivity_check
