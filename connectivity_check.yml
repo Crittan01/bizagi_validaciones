@@ -40,7 +40,9 @@
   tasks:
     - name: "Validar si hay targets configurados"
       ansible.builtin.debug:
-        msg: "Targets: {{ task_targets | length }} configurados"
+        msg:
+          - "Targets: {{ task_targets | length }} configurados"
+          - "Puertos: {{ task_ports | length }} configurados"
 
     - name: "Ejecutar Tarea 0.1 - {{ task_description }}"
       ansible.builtin.include_role:

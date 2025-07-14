@@ -11,7 +11,7 @@
 - name: "(FAIL) - Validar puertos para telnet"
   ansible.builtin.fail:
     msg: "Puertos requeridos para check_type telnet"
-  when: connectivity_check_check_type in ['telnet', 'telnet_bidirectional']
+  when: connectivity_check_check_type in ['telnet']
     and (connectivity_check_ports is not defined or connectivity_check_ports | length == 0)
 
 - name: "Mostrar configuración de la prueba"
