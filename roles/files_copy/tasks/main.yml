@@ -1,5 +1,5 @@
 # roles/file_operations/tasks/main.yml
-
+---
 - name: "(FAIL) - Validar parámetros requeridos"
   ansible.builtin.fail:
     msg: "Parámetro requerido faltante: {{ item }}"
@@ -10,7 +10,7 @@
 
 - name: "Mostrar configuración de la operación"
   ansible.builtin.debug:
-    msg: |
+    msg: |-
       ====================================
       TAREA {{ file_operations_task_id }}: {{ file_operations_task_description }}
       ====================================
@@ -79,7 +79,9 @@
 - name: "Mostrar archivos encontrados"
   ansible.builtin.debug:
     msg: |
-      📁 Archivos encontrados en {{ inventory_hostname }}:
+      ====================================
+      Archivos encontrados en {{ inventory_hostname }}:
+      ====================================
       {% if files_inventory | length > 0 %}
       {% for file in files_inventory %}
       📄 {{ file.name }} | Timestamp: {{ file.lastwritetime }} | {{ file.size }} bytes | {{ file.extension }}
@@ -87,6 +89,7 @@
       {% else %}
         No se encontraron archivos con los patrones especificados
       {% endif %}
+      ====================================
       Total: {{ files_inventory | length }} archivos
   when: file_operations_show_details | default(true)
 

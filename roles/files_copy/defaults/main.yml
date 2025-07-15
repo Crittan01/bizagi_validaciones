@@ -1,12 +1,14 @@
 ---
 # defaults file for roles/file_operations
+
+# Operación a realizar
 file_operations_operation_type: "inventory" # inventory|sync
 
 # Rutas de archivos
-file_operations_source_path: "D:\\Mis Documentos"
+file_operations_source_path: ""
 
 # Patrones de archivos a procesar
-file_operations_file_patterns: ["*.bat", "*.ps1"]
+file_operations_file_patterns: ["*.bat", "*.ps1", "*.txt"]
 
 # Información de la tarea
 file_operations_task_id: "unknown"
@@ -14,3 +16,7 @@ file_operations_task_description: "File operations check"
 
 # Configuración de salida
 file_operations_show_details: true
+
+# Configuración de retry (si es necesario)
+file_operations_retries: 3
+file_operations_retry_delay: 5

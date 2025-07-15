@@ -1,0 +1,417 @@
+---
+# run_task_03.yml - Tarea 0.3 COMPLETA con configuración de shares
+- name: "Tarea 0.3 Bizagi - Pre-configuración"
+  hosts: servers_contingencia
+  gather_facts: false
+
+  vars:
+    task_config:
+      id: "0_3"
+      description: "Crear carpeta compartida en contingencia"
+      name_share: "Cont_Documentos"
+      scripts_path: "D:\\Mis Documentos"
+      cont_share: "\\\\{{ groups['servers_contingencia'][0] }}\\Cont_Documentos"
+
+  pre_tasks:
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: fact_result
+
+    - name: "Establecer estado de los Facts"
+      ansible.builtin.set_fact:
+        facts_generated: true
+      when: ansible_os_family is defined
+
+  tasks:
+    - name: "Crear carpeta compartida en contingencia"
+      ansible.windows.win_share:
+        name: "{{ task_config.name_share }}"
+        path: "{{ task_config.scripts_path }}"
+        list: false
+        full: "ansible"
+        state: present
+        description: "{{ task_config.name_share }}"
+      register: share_creation
+      when:
+        - facts_generated is defined
+
+- name: "Tarea 0.3 Bizagi - Inventario de Scripts"
+  hosts: servers_origen
+  gather_facts: false
+  serial: 1
+
+  vars:
+    task_config:
+      id: "0_3"
+      description: "Sincronizar scripts Prod → Contingencia"
+      scripts_path: "D:\\Mis Documentos"
+      file_patterns: ["*.bat", "*.ps1"]
+
+  pre_tasks:
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: fact_result
+
+    - name: "Establecer estado de los Facts"
+      ansible.builtin.set_fact:
+        facts_generated: true
+      when: ansible_os_family is defined
+
+    - name: "Crear resultado si es No alcanzable"
+      when: facts_generated is not defined
+      block:
+        - name: "Registrar error de recolección de Facts"
+          ansible.builtin.set_fact:
+            file_operations_result:
+              start_time: "{{ ansible_date_time.date | default('N/A') }} - {{ ansible_date_time.time | default('N/A') }}"
+              task_id: "0_3"
+              source_host: "{{ inventory_hostname }}"
+              files_inventory: []
+              status: "unreachable"
+
+  tasks:
+    - name: "Ejecutar Tarea 0.3 - File Operations Inventory"
+      ansible.builtin.include_role:
+        name: files_copy
+      vars:
+        file_operations_operation_type: "inventory"
+        file_operations_source_path: "{{ task_config.scripts_path }}"
+        file_operations_file_patterns: "{{ task_config.file_patterns }}"
+        file_operations_task_id: "{{ task_config.id }}"
+        file_operations_task_description: "{{ task_config.description }}"
+        file_operations_show_details: true
+      when: facts_generated is defined
+
+    - name: "Mostrar resultado del inventario"
+      ansible.builtin.debug:
+        msg: |
+          Tarea {{ file_operations_result.task_id }} completada:
+          - Hora: {{ file_operations_result.start_time }}
+          - Host: {{ file_operations_result.source_host }}
+          - Status: {{ file_operations_result.status }}
+          - Archivos: {{ file_operations_result.files_found }}
+
+- name: "Tarea 0.3 - Análisis de Sincronización"
+  hosts: localhost
+
+  tasks:
+    - name: "Recuperar Facts"
+      ansible.builtin.setup:
+        filter: ansible_date_time
+      register: fact_result
+
+    - name: "Generar plan de sincronización"
+      ansible.builtin.set_fact:
+        sync_plan: |
+          {%- set prod_host = groups['servers_produccion'][0] -%}
+          {%- set cont_host = groups['servers_contingencia'][0] -%}
+          {%- set prod_files = hostvars[prod_host]['files_inventory'] | default([]) -%}
+          {%- set cont_files = hostvars[cont_host]['files_inventory'] | default([]) -%}
+          {%- set files_to_sync = [] -%}
+          {%- set files_in_sync = [] -%}
+          {%- set missing_in_cont = [] -%}
+          {%- set cont_only_files = [] -%}
+
+          {%- for prod_file in prod_files -%}
+            {%- set cont_file = cont_files | selectattr('name', 'equalto', prod_file.name) | first | default(none) -%}
+            {%- if cont_file -%}
+              {%- if prod_file.lastwritetime > cont_file.lastwritetime or prod_file.hash != cont_file.hash -%}
+                {%- set reason = 'newer' if prod_file.lastwritetime > cont_file.lastwritetime else 'different_content' -%}
+                {%- set _ = files_to_sync.append({
+                  'name': prod_file.name,
+                  'reason': reason,
+                  'prod_timestamp': prod_file.lastwritetime,
+                  'cont_timestamp': cont_file.lastwritetime,
+                  'prod_hash': prod_file.hash,
+                  'cont_hash': cont_file.hash,
+                  'size': prod_file.size
+                }) -%}
+              {%- else -%}
+                {%- set _ = files_in_sync.append(prod_file.name) -%}
+              {%- endif -%}
+            {%- else -%}
+              {%- set _ = missing_in_cont.append({
+                'name': prod_file.name,
+                'timestamp': prod_file.lastwritetime,
+                'size': prod_file.size
+              }) -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {%- for cont_file in cont_files -%}
+            {%- if not (prod_files | selectattr('name', 'equalto', cont_file.name) | list) -%}
+              {%- set _ = cont_only_files.append(cont_file.name) -%}
+            {%- endif -%}
+          {%- endfor -%}
+
+          {{ {
+            'prod_host': prod_host,
+            'cont_host': cont_host,
+            'files_to_sync': files_to_sync,
+            'files_in_sync': files_in_sync,
+            'missing_in_cont': missing_in_cont,
+            'cont_only_files': cont_only_files,
+            'prod_total': prod_files | length,
+            'cont_total': cont_files | length,
+            'sync_required': (files_to_sync | length > 0) or (missing_in_cont | length > 0)
+          } }}
+
+    - name: "REPORTE DE ANÁLISIS - TAREA 0.3"
+      ansible.builtin.debug:
+        msg: |
+          ================================================================
+                         ANÁLISIS DE SINCRONIZACIÓN - TAREA 0.3
+                    Productivo ({{ groups['servers_produccion'][0] }}) → Contingencia ({{ groups['servers_contingencia'][0] }})
+          ================================================================
+          Productivo: {{ sync_plan.prod_total }} archivos
+          Contingencia: {{ sync_plan.cont_total }} archivos
+
+          ARCHIVOS A ACTUALIZAR: {{ sync_plan.files_to_sync | length }}
+          {% for file in sync_plan.files_to_sync %}
+          - Archivo: {{ file.name }} ({{ file.reason }})
+            Date Prod: {{ file.prod_timestamp }} | Date Cont: {{ file.cont_timestamp }}
+          {% endfor %}
+
+          ARCHIVOS FALTANTES EN CONTINGENCIA: {{ sync_plan.missing_in_cont | length }}
+          {% for file in sync_plan.missing_in_cont %}
+          - Archivo: {{ file.name }} ({{ file.size }} bytes)
+          {% endfor %}
+
+          ARCHIVOS SINCRONIZADOS: {{ sync_plan.files_in_sync | length }}
+          {% for file in sync_plan.files_in_sync %}
+          - Archivo: {{ file }}
+          {% endfor %}
+
+          ARCHIVOS SOLO EN CONTINGENCIA: {{ sync_plan.cont_only_files | length }}
+          {% for file in sync_plan.cont_only_files %}
+          - Archivo: {{ file }}
+          {% endfor %}
+
+          RECOMENDACIÓN: {% if sync_plan.sync_required %} EJECUTAR SINCRONIZACION{% else %} NO SE REQUIERE ACCION{% endif %}
+
+    - name: "Registrar análisis en stats globales"
+      ansible.builtin.set_stats:
+        data:
+          bizagi_task_0_3_analysis:
+            analysis_timestamp: "{{ ansible_date_time.iso8601 }}"
+            sync_required: "{{ sync_plan.sync_required }}"
+            summary:
+              files_to_update: "{{ sync_plan.files_to_sync | length }}"
+              files_missing: "{{ sync_plan.missing_in_cont | length }}"
+              files_in_sync: "{{ sync_plan.files_in_sync | length }}"
+              cont_only_files: "{{ sync_plan.cont_only_files | length }}"
+            sync_plan: "{{ sync_plan }}"
+        per_host: false
+
+- name: "Tarea 0.3 - Ejecutar Sincronización"
+  hosts: servers_produccion # Desde productivo
+  gather_facts: false
+
+  vars:
+    sync_config:
+      source_path: "D:\\Mis Documentos"
+      dest_unc: "\\\\{{ hostvars[groups['servers_contingencia'][0]]['ansible_host'] }}\\D$\\Mis Documentos"
+      execute_sync: true
+      backup_enabled: true
+
+  pre_tasks:
+    - name: "Verificar si sincronización es requerida"
+      ansible.builtin.set_fact:
+        sync_needed: "{{ hostvars['localhost']['sync_plan']['sync_required'] | default(false) }}"
+
+    - name: "Mostrar estado de sincronización"
+      ansible.builtin.debug:
+        msg: |-
+          ================================================================
+          VERIFICACIÓN DE SINCRONIZACIÓN:
+          ================================================================
+          Sincronización requerida: {{ sync_needed }}
+          Execute sync: {{ sync_config.execute_sync }}
+
+          {% if not sync_needed %}
+            No se requiere sincronización - todos los archivos están al día
+          {% else %}
+          🔄 Sincronización requerida:
+          - Archivos a actualizar: {{ hostvars['localhost']['sync_plan']['files_to_sync'] | length }}
+          - Archivos faltantes: {{ hostvars['localhost']['sync_plan']['missing_in_cont'] | length }}
+          {% endif %}
+
+  tasks:
+    - name: "Verificar accesibilidad del share UNC"
+      ansible.windows.win_stat:
+        path: "{{ sync_config.dest_unc }}"
+      register: unc_check
+
+    - name: "Mostrar estado del share"
+      ansible.builtin.debug:
+        msg: |-
+          ================================================================
+          VERIFICACIÓN DEL SHARE UNC:
+          ================================================================
+          Path: {{ sync_config.dest_unc }}
+          Contingencia: {{ groups['servers_contingencia'][0] }}
+          Disponible: {{ unc_check.stat.exists | default('N/A') }}
+
+          {% if unc_check.stat is defined and not unc_check.stat.exists %}
+          ❌ ERROR: Share no disponible. Verificar:
+          1. Share "Cont_Documentos" en {{ groups['servers_contingencia'][0] }}
+          2. Permisos de red correctos
+          3. Conectividad entre servidores
+          {% endif %}
+      when: sync_needed
+
+    - name: "Crear backup antes de sincronizar"
+      community.windows.win_robocopy:
+        src: "{{ sync_config.dest_unc }}"
+        dest: "{{ sync_config.dest_unc }}_backup_{{ ansible_date_time.epoch }}"
+        flags: "/E /R:1 /W:5"
+      register: backup_result
+      when:
+        - sync_needed
+        - sync_config.execute_sync
+        - sync_config.backup_enabled | default(false)
+        - unc_check.stat.exists | default(false)
+      ignore_errors: true
+
+    - name: "Ejecutar sincronización con robocopy"
+      community.windows.win_robocopy:
+        src: "{{ sync_config.source_path }}"
+        dest: "{{ sync_config.dest_unc }}"
+        flags: "/E /XO /R:3 /W:10 /MT:4"
+        purge: false # No eliminar archivos extra en contingencia
+      register: robocopy_result
+      when:
+        - sync_needed
+        - sync_config.execute_sync
+        - unc_check.stat.exists | default(false)
+
+    - name: "Interpretar código de retorno de robocopy"
+      ansible.builtin.set_fact:
+        sync_status: |
+          {%- if robocopy_result.return_code is defined -%}
+            {%- if robocopy_result.return_code == 0 -%}success_no_changes
+            {%- elif robocopy_result.return_code == 1 -%}success_files_copied
+            {%- elif robocopy_result.return_code == 2 -%}success_extra_files
+            {%- elif robocopy_result.return_code == 3 -%}success_files_and_extra
+            {%- elif robocopy_result.return_code in [4, 5, 6, 7] -%}warning_mismatches
+            {%- else -%}error
+            {%- endif -%}
+          {%- else -%}not_executed
+          {%- endif -%}
+      when: robocopy_result is defined
+
+    - name: "RESULTADO DE SINCRONIZACIÓN"
+      ansible.builtin.debug:
+        msg: |-
+          ================================================================
+                            RESULTADO DE SINCRONIZACIÓN
+          ================================================================
+          Origen: {{ inventory_hostname }} ({{ sync_config.source_path }})
+          Destino: {{ groups['servers_contingencia'][0] }} ({{ sync_config.dest_unc }})
+
+          {% if not sync_needed %}
+            NO EJECUTADA - No se requería sincronización
+          {% elif not sync_config.execute_sync %}
+            NO EJECUTADA - execute_sync=false (solo análisis)
+          {% elif not (unc_check.stat.exists | default(false)) %}
+          ❌ NO EJECUTADA - Share UNC no disponible
+          {% else %}
+          🔄 SINCRONIZACIÓN EJECUTADA:
+
+          Return Code: {{ robocopy_result.return_code }}
+          Status: {{ sync_status }}
+
+          📊 ESTADÍSTICAS:
+          - Archivos copiados: {{ robocopy_result.files | default(0) }}
+          - Directorios: {{ robocopy_result.directories | default(0) }}
+          - Bytes transferidos: {{ robocopy_result.bytes | default(0) }}
+          - Tiempo: {{ robocopy_result.time | default('N/A') }}
+
+          📁 RESULTADO:
+          {% if sync_status in ['success_files_copied', 'success_files_and_extra'] %}
+          ✅ ÉXITO - Archivos sincronizados correctamente
+          - prueba1.ps1 → Actualizado a versión más reciente
+          - bat2.bat → Copiado desde productivo
+          {% elif sync_status == 'success_no_changes' %}
+            SIN CAMBIOS - Todos los archivos ya estaban actualizados
+          {% elif sync_status.startswith('warning') %}
+            COMPLETADO CON ADVERTENCIAS - Revisar log
+          {% else %}
+          ❌ ERROR - Revisar log en D:\Logs\bizagi_sync_{{ ansible_date_time.epoch }}.log
+          {% endif %}
+
+          Log File: D:\Logs\bizagi_sync_{{ ansible_date_time.epoch }}.log
+          {% endif %}
+          ================================================================
+
+- name: "Tarea 0.3 - Verificación Post-Sincronización"
+  hosts: servers_contingencia
+  gather_facts: false
+
+  tasks:
+    - name: "Verificar si se ejecutó sincronización"
+      ansible.builtin.set_fact:
+        sync_was_executed: "{{ hostvars[groups['servers_produccion'][0]]['robocopy_result'] is defined }}"
+
+    - name: "Inventario post-sincronización"
+      ansible.builtin.include_role:
+        name: files_copy
+      vars:
+        file_operations_operation_type: "inventory"
+        file_operations_source_path: "D:\\Mis Documentos"
+        file_operations_file_patterns: ["*.bat", "*.ps1"]
+        file_operations_task_id: "0_3_post_verification"
+        file_operations_task_description: "Verificación post-sincronización"
+        file_operations_show_details: true
+      when: sync_was_executed
+
+    - name: "Comparar antes vs después"
+      ansible.builtin.debug:
+        msg: |-
+          ========================================
+          COMPARACIÓN RESULTADO DE SINCRONIZACIÓN:
+          ========================================
+          {% set sync_was_successful = hostvars[groups['servers_produccion'][0]]['robocopy_result'] is defined
+            and hostvars[groups['servers_produccion'][0]]['robocopy_result']['return_code'] is defined %}
+          {% set prod_files = hostvars['localhost']['sync_plan']['prod_total'] %}
+          {% set cont_files_before = hostvars['localhost']['sync_plan']['cont_total'] %}
+          {% set cont_files_after = files_inventory | default([]) | length %}
+
+          Productivo     (ahora): {{ prod_files }} archivos
+          Contingencia   (antes): {{ cont_files_before }} archivos
+          Contingencia (después): {{ cont_files_after }} archivos
+
+          {% if not sync_was_successful %}
+          ❌ SINCRONIZACIÓN NO EJECUTADA
+          Motivo: {{ hostvars[groups['servers_produccion'][0]]['sync_status'] | default('Error desconocido') }}
+          Resultado: Contingencia sin cambios ({{ cont_files_before }} → {{ cont_files_after }})
+          Pendiente: {{ hostvars['localhost']['sync_plan']['files_to_sync'] | length }}
+            archivos a actualizar + {{ hostvars['localhost']['sync_plan']['missing_in_cont'] | length }} archivos faltantes
+          {% elif cont_files_after > cont_files_before %}
+            SINCRONIZACIÓN EXITOSA
+          Se agregaron {{ cont_files_after - cont_files_before }} archivos
+          {% elif cont_files_after == prod_files %}
+            SINCRONIZACIÓN COMPLETA
+          Contingencia ahora igual a productivo ({{ prod_files }} archivos)
+          {% else %}
+            SINCRONIZACIÓN PARCIAL
+          Faltan {{ prod_files - cont_files_after }} archivos por sincronizar
+          {% endif %}
+      when: sync_was_executed
+
+    - name: "Registrar verificación en stats"
+      ansible.builtin.set_stats:
+        data:
+          bizagi_task_0_3_verification:
+            verification_timestamp: "{{ ansible_date_time.iso8601 }}"
+            verification_host: "{{ inventory_hostname }}"
+            prod_files_total: "{{ hostvars['localhost']['sync_plan']['prod_total'] }}"
+            cont_files_before: "{{ hostvars['localhost']['sync_plan']['cont_total'] }}"
+            cont_files_after: "{{ files_inventory | default([]) | length }}"
+            sync_executed: "{{ hostvars[groups['servers_produccion'][0]]['robocopy_result'] is defined }}"
+            sync_successful: "{{ hostvars[groups['servers_produccion'][0]]['sync_status'] | default('not_executed') != 'not_executed' }}"
+            files_pending: "{{ hostvars['localhost']['sync_plan']['files_to_sync'] | length + hostvars['localhost']['sync_plan']['missing_in_cont'] | length }}"
+        per_host: false
+      when: sync_was_executed
