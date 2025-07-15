@@ -1,0 +1,17 @@
+---
+# defaults file for roles/telnet_check
+telnet_check_check_type: "telnet"
+
+# Hosts destino (debe ser definido en playbook)
+telnet_check_target_hosts: []
+
+# Puertos a validar (solo para telnet)
+telnet_check_ports: []
+
+# Configuración de timeouts
+telnet_check_retries: 3
+telnet_check_retry_delay: 2
+
+# Información de la tarea
+telnet_check_task_id: "unknown"
+telnet_check_task_description: "Connectivity check"
