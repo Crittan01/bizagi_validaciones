@@ -43,3 +43,9 @@
     - comparison_completed | default(false)
   tags:
     - report
+
+- name: "Realizar Copia de archivos (faltantes y desactualizados)"
+  ansible.builtin.include_tasks: copy_files.yml
+  when:
+    - validation_passed | default(false)
+    - comparison_completed | default(false)

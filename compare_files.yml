@@ -29,7 +29,7 @@
           - groups['servers_produccion'] | length > 0
           - groups['servers_contingencia'] | length > 0
         fail_msg: "ERROR: Los grupos servers_produccion y/o servers_contingencia no están definidos"
-        success_msg: "✓ Grupos validados correctamente"
+        success_msg: "OK: Grupos validados correctamente"
       tags: validation
 
     - name: "Establecer variables globales"
@@ -66,7 +66,7 @@
           - prod_path_check.stat.exists
           - prod_path_check.stat.isdir
         fail_msg: "ERROR: La ruta no existe en {{ inventory_hostname }}"
-        success_msg: "✓ Ruta validada en {{ inventory_hostname }}"
+        success_msg: "OK: Ruta validada en {{ inventory_hostname }}"
       tags: validation
 
 # Play 3: Validación de conectividad en servidores de contingencia
@@ -91,7 +91,7 @@
           - cont_path_check.stat.exists
           - cont_path_check.stat.isdir
         fail_msg: "ERROR: La ruta no existe en {{ inventory_hostname }}"
-        success_msg: "✓ Ruta validada en {{ inventory_hostname }}"
+        success_msg: "OK: Ruta validada en {{ inventory_hostname }}"
       tags: validation
 
 # Play 4: Recolección de archivos de producción
@@ -127,7 +127,7 @@
           {{ files }}
       tags: collection
 
-    - name: "Compartir archivos de producción"
+    - name: "Compartir (Fact) archivos de producción"
       ansible.builtin.set_fact:
         all_prod_files: "{{ prod_files_dict }}"
         prod_file_count: "{{ prod_files_dict | length }}"
@@ -168,7 +168,7 @@
           {{ files }}
       tags: collection
 
-    - name: "Compartir archivos de contingencia"
+    - name: "Compartir (Fact) archivos de contingencia"
       ansible.builtin.set_fact:
         all_cont_files: "{{ cont_files_dict }}"
         cont_file_count: "{{ cont_files_dict | length }}"
@@ -255,6 +255,14 @@
           timestamp: "{{ comparison_config.timestamp }}"
       tags: comparison
 
+    - name: "Compartir (Fact) con cada host de servers_produccion"
+      ansible.builtin.set_fact:
+        all_summary: "{{ comparison_summary }}"
+      delegate_to: "{{ item }}"
+      delegate_facts: true
+      loop: "{{ groups['servers_produccion'] }}"
+      tags: comparison
+
     - name: "Mostrar reporte visual"
       ansible.builtin.debug:
         msg:
@@ -309,6 +317,77 @@
             missing: "{{ comparison_summary.missing_count | int }}"
             outdated: "{{ comparison_summary.outdated_count | int }}"
             identical: "{{ comparison_summary.identical_count | int }}"
+        per_host: false
+        aggregate: false
+      tags: report
+
+#  Play 6:
+- name: "Recolectar Info de Produccion"
+  hosts: servers_produccion
+  gather_facts: false
+  tasks:
+    - name: DEBUG
+      ansible.builtin.debug:
+        var: all_summary
+
+    - name: Unificar archivos a copiar con nombre
+      ansible.builtin.set_fact:
+        files_to_copy: >-
+          {%- set files = [] -%}
+          {%- for file in all_summary.missing_files -%}
+            {%- set _ = files.append({
+              'name': file.name,
+              'path': file.details.path,
+              'server': file.details.server
+            }) -%}
+          {%- endfor -%}
+          {%- for file in all_summary.outdated_files -%}
+            {%- set _ = files.append({
+              'name': file.name,
+              'path': file.source.path,
+              'server': file.source.server
+            }) -%}
+          {%- endfor -%}
+          {{ files }}
+
+    - name: "Ejecutar robocopy para sincronización"
+      community.windows.win_robocopy:
+        src: "{{ file_comparison_default_comparison_path }}"
+        dest: >-
+          \\{{ hostvars[groups['servers_contingencia'][0]].ansible_host }}\D$\Mis Documentos
+        flags: "/E /XO /R:3 /W:10 /MT:4"
+      register: robocopy_result
+
+    - name: "Mostrar reporte visual"
+      ansible.builtin.debug:
+        msg:
+          - "╔═══════════════════════════════════════════════════════════════"
+          - "║           REPORTE COPIA DE ARCHIVOS                  "
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ Task: {{ all_summary.task_description }}"
+          - "║ Fecha: {{ all_summary.timestamp }}"
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ RESUMEN DE RESULTADOS:"
+          - "║ Total archivos en producción:    {{ all_summary.total_source_files }}"
+          - "║"
+          - "║ Total archivos en contingencia:  {{ all_summary.total_target_files }}"
+          - "║ Archivos faltantes:              {{ all_summary.missing_count }}"
+          - "║ Archivos desactualizados:        {{ all_summary.outdated_count }}"
+          - "║"
+          - "║ Copia faltantes:                 {{ all_summary.missing_count }}"
+          - "║ Copia desactualizados:           {{ all_summary.outdated_count }}"
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ RESULTADO: {{ robocopy_result.msg }}"
+          - "╚═══════════════════════════════════════════════════════════════"
+
+    - name: "Registrar estadísticas copia"
+      ansible.builtin.set_stats:
+        data:
+          task_key: "task_{{ all_summary.task_id }}"
+          task_copy:
+            status: "{{ robocopy_result.msg }}"
+            copy_missing: "{{ all_summary.missing_count | int }}"
+            copy_outdated: "{{ all_summary.outdated_count | int }}"
         per_host: false
         aggregate: false
       tags: report

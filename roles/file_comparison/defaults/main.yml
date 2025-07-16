@@ -12,6 +12,7 @@ file_comparison_file_patterns:
 
 # Ruta por defecto para comparación
 file_comparison_default_comparison_path: "D:\\Mis Documentos"
+file_comparison_default_dest_path: "D$\\Mis Documentos"
 
 # Grupos de servidores
 file_comparison_source_group: "servers_produccion"

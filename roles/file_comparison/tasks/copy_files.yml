@@ -1,0 +1,4 @@
+---
+- name: DEBUG
+  ansible.builtin.debug:
+    var: comparison_summary

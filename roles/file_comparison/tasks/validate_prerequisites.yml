@@ -79,7 +79,7 @@
       Ruta: {{ file_comparison_default_comparison_path }}
       Existe: {{ item.stat.exists | default('false') }}
       Es directorio: {{ item.stat.isdir | default('false') }}
-    success_msg: "✓ Ruta validada en {{ item.item }}"
+    success_msg: "OK: Ruta validada en {{ item.item }}"
   loop: "{{ source_path_check.results + target_path_check.results }}"
   loop_control:
     label: "{{ item.item }}"
