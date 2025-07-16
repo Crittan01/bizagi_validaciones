@@ -8,7 +8,7 @@
     # variables a nivel playbook
     task_targets: "{{ (task_targets_input | default('')) | split('\n') | list }}"
     task_ports: "{{ (task_ports_input | default('')) | split('\n') | list }}"
-    task_id: "telnet"
+    task_id: "{{ custom_task_id | default('telnet') }}"
     task_description: "Prueba Conectividad Telnet"
 
   pre_tasks:
