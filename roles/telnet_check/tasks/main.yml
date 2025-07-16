@@ -82,7 +82,7 @@
       execution_time: "{{ ansible_date_time.iso8601 }}"
 
 # Registrar en AWX (set_stats)
-- name: "Agregar host a resultados de la task"
+- name: "Registrar estadísticas"
   ansible.builtin.set_stats:
     data:
       "{{ task_key }}": "{{ current_task_data | combine({'hosts': updated_hosts}) }}"
