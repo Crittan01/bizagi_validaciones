@@ -16,15 +16,15 @@
 
 - name: "Mostrar configuración de la prueba"
   ansible.builtin.debug:
-    msg: |
-      ====================================
-      TAREA {{ telnet_check_task_id }}: {{ telnet_check_task_description }}
-      ====================================
-      Desde: {{ inventory_hostname }}
-      Tipo: {{ telnet_check_check_type }}
-      Destinos: {{ telnet_check_target_hosts | join(', ') }}
-      Puertos: {{ telnet_check_ports | default(['N/A']) | join(', ') }}
-      ====================================
+    msg:
+      - "===================================="
+      - "TAREA {{ telnet_check_task_id }}: {{ telnet_check_task_description }}"
+      - "===================================="
+      - "Desde: {{ inventory_hostname }}"
+      - "Tipo: {{ telnet_check_check_type }}"
+      - "Destinos: {{ telnet_check_target_hosts | join(', ') }}"
+      - "Puertos: {{ telnet_check_ports | default(['N/A']) | join(', ') }}"
+      - "===================================="
 
 - name: "Ejecutar test de conectividad"
   block:

@@ -59,12 +59,12 @@
 
     - name: "CLICK: Mostrar resultado"
       ansible.builtin.debug:
-        msg: |
-          ====================================
-          TAREA {{ connectivity_result.task_id }} completada:
-          ====================================
-          Hora: {{ connectivity_result.start_time }}
-          Host: {{ connectivity_result.source_host }}
-          Status: {{ connectivity_result.status }}
-          Results: {{ connectivity_result.results }}
-          ====================================
+        msg:
+          - "===================================="
+          - "TAREA {{ connectivity_result.task_id }} completada:"
+          - "===================================="
+          - "Hora: {{ connectivity_result.start_time }}"
+          - "Host: {{ connectivity_result.source_host }}"
+          - "Status: {{ connectivity_result.status }}"
+          - "Results: {{ connectivity_result.results }}"
+          - "===================================="
