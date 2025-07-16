@@ -1,0 +1,95 @@
+---
+# Recolectar información de archivos
+# Task ID: {{ file_comparison_task_id }} - {{ file_comparison_task_description }}
+
+- name: "Recolectar archivos del servidor de producción"
+  ansible.windows.win_find:
+    paths: "{{ file_comparison_default_comparison_path }}"
+    patterns: "{{ file_comparison_file_patterns }}"
+    recurse: false
+  register: source_files_raw
+  loop: "{{ source_servers }}"
+  delegate_to: "{{ item }}"
+
+- name: "Recolectar archivos del servidor de contingencia"
+  ansible.windows.win_find:
+    paths: "{{ file_comparison_default_comparison_path }}"
+    patterns: "{{ file_comparison_file_patterns }}"
+    recurse: false
+  register: target_files_raw
+  loop: "{{ target_servers }}"
+  delegate_to: "{{ item }}"
+
+- name: "Procesar archivos encontrados en producción"
+  ansible.builtin.set_fact:
+    source_files: >-
+      {%- set files = {} -%}
+      {%- for server_result in source_files_raw.results -%}
+        {%- for file in server_result.files -%}
+          {%- set _ = files.update({
+            file.path | win_basename: {
+              'path': file.path,
+              'size': file.size,
+              'checksum': file.checksum | default('N/A'),
+              'lastwritetime': file.lastwritetime,
+              'server': server_result.item,
+              'server_type': 'produccion'
+            }
+          }) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ files }}
+
+- name: "Procesar archivos encontrados en contingencia"
+  ansible.builtin.set_fact:
+    target_files: >-
+      {%- set files = {} -%}
+      {%- for server_result in target_files_raw.results -%}
+        {%- for file in server_result.files -%}
+          {%- set _ = files.update({
+            file.path | win_basename: {
+              'path': file.path,
+              'size': file.size,
+              'checksum': file.checksum | default('N/A'),
+              'lastwritetime': file.lastwritetime,
+              'server': server_result.item,
+              'server_type': 'contingencia'
+            }
+          }) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ files }}
+
+- name: "Debug - Mostrar archivos procesados"
+  ansible.builtin.debug:
+    msg: |
+      Archivos en producción: {{ source_files.keys() | list }}
+      Archivos en contingencia: {{ target_files.keys() | list }}
+  when: false # Cambiar a true para ansible.builtin.debug
+
+- name: "Mostrar resumen de archivos encontrados"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════════════"
+      - "RESUMEN DE ARCHIVOS ENCONTRADOS"
+      - "════════════════════════════════════════════════════"
+      - "Producción ({{ file_comparison_source_group }}): {{ source_files.keys() | list | length }} archivos"
+      - "Contingencia ({{ file_comparison_target_group }}): {{ target_files.keys() | list | length }} archivos"
+      - "════════════════════════════════════════════════════"
+
+- name: "Listar archivos encontrados en producción"
+  ansible.builtin.debug:
+    msg: "{{ item.key }} ({{ item.value.size }} bytes)"
+  loop: "{{ source_files | dict2items }}"
+  when: source_files.keys() | list | length > 0
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Marcar recolección como completada"
+  ansible.builtin.set_fact:
+    files_collected: true
+    collection_summary:
+      source_count: "{{ source_files.keys() | list | length }}"
+      target_count: "{{ target_files.keys() | list | length }}"
+      patterns_used: "{{ file_comparison_file_patterns }}"
+      path_scanned: "{{ file_comparison_default_comparison_path }}"

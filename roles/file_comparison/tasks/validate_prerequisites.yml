@@ -1,0 +1,105 @@
+---
+# Validación de prerequisitos
+# Task ID: {{ file_comparison_task_id }} - {{ file_comparison_task_description }}
+
+- name: "Validar que existen grupos de origen y destino"
+  ansible.builtin.assert:
+    that:
+      - groups[file_comparison_source_group] is defined
+      - groups[file_comparison_target_group] is defined
+      - groups[file_comparison_source_group] | length > 0
+      - groups[file_comparison_target_group] | length > 0
+    fail_msg: |
+      ERROR: Los grupos de servidores no están correctamente definidos
+      Grupo origen '{{ file_comparison_source_group }}': {{ groups[file_comparison_source_group] | default('NO DEFINIDO') }}
+      Grupo destino '{{ file_comparison_target_group }}': {{ groups[file_comparison_target_group] | default('NO DEFINIDO') }}
+    success_msg: "OK: Grupos de servidores validados correctamente"
+
+- name: "Obtener lista de servidores"
+  ansible.builtin.set_fact:
+    source_servers: "{{ groups[file_comparison_source_group] }}"
+    target_servers: "{{ groups[file_comparison_target_group] }}"
+    validation_timestamp: "{{ ansible_date_time.iso8601 }}"
+
+- name: Mostrar servidores a validar
+  ansible.builtin.debug:
+    msg:
+      - "Producción: {{ source_servers | join(', ') }}"
+      - "Contingencia: {{ target_servers | join(', ') }}"
+
+- name: "Validar conectividad con servidores de producción"
+  ansible.windows.win_ping:
+  register: ping_source
+  loop: "{{ source_servers }}"
+  delegate_to: "{{ item }}"
+  failed_when: false
+
+- name: "Validar conectividad con servidores de contingencia"
+  ansible.windows.win_ping:
+  register: ping_target
+  loop: "{{ target_servers }}"
+  delegate_to: "{{ item }}"
+  failed_when: false
+
+- name: "Verificar resultados de conectividad"
+  ansible.builtin.assert:
+    that:
+      - item.ping is defined
+      - item.ping == 'pong'
+    fail_msg: "ERROR: No se puede conectar al servidor {{ item.item }}"
+    success_msg: "OK: Conectividad OK con {{ item.item }}"
+  loop: "{{ ping_source.results + ping_target.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: "Validar existencia de ruta en servidores de producción"
+  ansible.windows.win_stat:
+    path: "{{ file_comparison_default_comparison_path }}"
+  register: source_path_check
+  loop: "{{ source_servers }}"
+  delegate_to: "{{ item }}"
+  failed_when: false
+
+- name: "Validar existencia de ruta en servidores de contingencia"
+  ansible.windows.win_stat:
+    path: "{{ file_comparison_default_comparison_path }}"
+  register: target_path_check
+  loop: "{{ target_servers }}"
+  delegate_to: "{{ item }}"
+  failed_when: false
+
+- name: "Verificar que todas las rutas existen"
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isdir
+    fail_msg: |
+      ERROR: La ruta no existe o no es un directorio
+      Servidor: {{ item.item }}
+      Ruta: {{ file_comparison_default_comparison_path }}
+      Existe: {{ item.stat.exists | default('false') }}
+      Es directorio: {{ item.stat.isdir | default('false') }}
+    success_msg: "✓ Ruta validada en {{ item.item }}"
+  loop: "{{ source_path_check.results + target_path_check.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: "Marcar validación como exitosa"
+  ansible.builtin.set_fact:
+    validation_passed: true
+    validation_summary:
+      source_servers: "{{ source_servers }}"
+      target_servers: "{{ target_servers }}"
+      path_validated: "{{ file_comparison_default_comparison_path }}"
+      timestamp: "{{ validation_timestamp }}"
+
+- name: "Mostrar resumen de validación"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════"
+      - "VALIDACIÓN COMPLETADA EXITOSAMENTE"
+      - "════════════════════════════════════════════"
+      - "Producción: {{ source_servers | join(', ') }}"
+      - "Contingencia: {{ target_servers | join(', ') }}"
+      - "Ruta validada: {{ file_comparison_default_comparison_path }}"
+      - "════════════════════════════════════════════"

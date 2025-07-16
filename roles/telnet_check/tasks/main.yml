@@ -29,17 +29,7 @@
 - name: "Ejecutar test de conectividad"
   block:
     - name: "Test conectividad con Test-NetConnection"
-      ansible.windows.win_shell: |
-        {% for host in telnet_check_target_hosts %}
-        {% for port in telnet_check_ports %}
-        $result = Test-NetConnection -ComputerName "{{ host }}" -Port {{ port }} -InformationLevel Quiet -WarningAction SilentlyContinue
-        if ($result) {
-            Write-Host "{{ host }}:{{ port }} = SUCCESS"
-        } else {
-            Write-Host "{{ host }}:{{ port }} = FAILED"
-        }
-        {% endfor %}
-        {% endfor %}
+      ansible.windows.win_shell: "{{ lookup('template', 'telnet_check.ps1.j2') }}"
       register: connectivity_test
       retries: "{{ telnet_check_retries }}"
       delay: "{{ telnet_check_retry_delay }}"

@@ -1,0 +1,177 @@
+---
+# Generar reporte de comparación - CORRECCIÓN VARIABLES AWX
+# Task ID: {{ file_comparison_task_id }} - {{ file_comparison_task_description }}
+
+- name: "Mostrar reporte visual en consola"
+  ansible.builtin.debug:
+    msg:
+      - "╔═══════════════════════════════════════════════════════════════"
+      - "║           REPORTE DE COMPARACIÓN DE ARCHIVOS                  "
+      - "╠═══════════════════════════════════════════════════════════════"
+      - "║ Task: {{ file_comparison_task_description }}"
+      - "║ ID: {{ file_comparison_task_id }}"
+      - "║ Fecha: {{ comparison_timestamp }}"
+      - "╠═══════════════════════════════════════════════════════════════"
+      - "║ CONFIGURACIÓN:"
+      - "║ Origen: {{ file_comparison_source_group }} ({{ source_servers | join(', ') }})"
+      - "║ Destino: {{ file_comparison_target_group }} ({{ target_servers | join(', ') }})"
+      - "║ Ruta: {{ file_comparison_default_comparison_path }}"
+      - "╠═══════════════════════════════════════════════════════════════"
+      - "║ RESUMEN DE RESULTADOS:"
+      - "║ ─────────────────────"
+      - "║ Total archivos en producción:    {{ comparison_summary.total_source_files }}"
+      - "║ Total archivos en contingencia:  {{ comparison_summary.total_target_files }}"
+      - "║ Archivos faltantes:              {{ comparison_summary.missing_count }}"
+      - "║ Archivos desactualizados:        {{ comparison_summary.outdated_count }}"
+      - "║ Archivos idénticos:              {{ comparison_summary.identical_count }}"
+      - "╠═══════════════════════════════════════════════════════════════"
+      - "║ ESTADO: {{ comparison_summary.status }}"
+      - "╚═══════════════════════════════════════════════════════════════"
+
+- name: "Armar mensaje de archivos faltantes"
+  ansible.builtin.set_fact:
+    missing_files_msg: |-
+      {% if missing_files | length > 0 %}
+      {% for file in missing_files %}
+        Archivo: {{ file.name }}
+        Ubicación: {{ file.details.path }}
+        Tamaño: {{ file.details.size }} bytes
+        Modificado: {{ file.details.lastwritetime }}
+      {% endfor %}
+      {% else %}
+      No hay archivos faltantes.
+      {% endif %}
+
+- name: "Mostrar archivos faltantes"
+  ansible.builtin.debug:
+    msg:
+      - "═════════════════════════════════════════"
+      - "ARCHIVOS FALTANTES EN CONTINGENCIA:"
+      - "═════════════════════════════════════════"
+      - "{{ missing_files_msg.split('\n') }}"
+
+- name: "Armar mensaje de archivos desactualizados"
+  ansible.builtin.set_fact:
+    outdated_files_msg: |-
+      {% if outdated_files | length > 0 %}
+      {% for file in outdated_files %}
+        Archivo:            {{ file.name }}
+        Fecha Producción:    {{ file.source.lastwritetime }}
+        Fecha Contingencia:  {{ file.target.lastwritetime }}
+        Servidor Prod:       {{ file.source.server }}
+        Servidor Cont:       {{ file.target.server }}
+      {% endfor %}
+      {% else %}
+      No hay archivos desactualizados.
+      {% endif %}
+
+- name: "Mostrar archivos desactualizados"
+  ansible.builtin.debug:
+    msg:
+      - "═════════════════════════════════════════"
+      - "ARCHIVOS DESACTUALIZADOS EN CONTINGENCIA:"
+      - "═════════════════════════════════════════"
+      - "{{ outdated_files_msg.split('\n') }}"
+  when: outdated_files is defined and outdated_files | length > 0
+
+- name: "Mostrar mensaje si todo está sincronizado"
+  ansible.builtin.debug:
+    msg:
+      - "═════════════════════════════════════════"
+      - "TODOS LOS ARCHIVOS ESTÁN SINCRONIZADOS"
+      - "═════════════════════════════════════════"
+      - "No se encontraron diferencias entre producción y contingencia."
+      - "Total de archivos verificados: {{ comparison_summary.total_source_files }}"
+  when:
+    - missing_files | length == 0
+    - outdated_files | length == 0
+
+- name: "Registrar estadísticas para AWX"
+  ansible.builtin.set_stats:
+    data:
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_description": "{{ file_comparison_task_description }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_status": "{{ comparison_summary.status }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_total_source": "{{ comparison_summary.total_source_files | int }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_total_target": "{{ comparison_summary.total_target_files | int }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_missing": "{{ comparison_summary.missing_count | int }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_outdated": "{{ comparison_summary.outdated_count | int }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_identical": "{{ comparison_summary.identical_count | int }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_timestamp": "{{ comparison_timestamp }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_missing_list":
+        "{{ missing_files | map(attribute='name')
+        | join(',') if missing_files is defined else '' }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_outdated_list":
+        "{{ outdated_files | map(attribute='name')
+        | join(',') if outdated_files is defined else '' }}"
+      "task_{{ file_comparison_task_id | regex_replace('[^a-zA-Z0-9_]', '_') }}_comparison_path": "{{ file_comparison_default_comparison_path }}"
+    per_host: false
+    aggregate: true
+
+- name: "Crear contenido del reporte para archivo"
+  ansible.builtin.set_fact:
+    report_content: |
+      ════════════════════════════════════════════════════════════════
+                        {{ file_comparison_task_description }}
+                           Task ID: {{ file_comparison_task_id }}
+      ════════════════════════════════════════════════════════════════
+
+      INFORMACIÓN GENERAL:
+      ────────────────────
+      Fecha de ejecución: {{ comparison_timestamp }}
+      Estado: {{ comparison_summary.status }}
+
+      CONFIGURACIÓN:
+      ──────────────
+      Grupo Origen: {{ file_comparison_source_group }}
+      Servidores: {{ source_servers | join(', ') }}
+
+      Grupo Destino: {{ file_comparison_target_group }}
+      Servidores: {{ target_servers | join(', ') }}
+
+      Ruta comparada: {{ file_comparison_default_comparison_path }}
+      Patrones de archivo: {{ file_comparison_file_patterns | join(', ') }}
+
+      RESUMEN DE RESULTADOS:
+      ──────────────────────
+      Total archivos en producción:   {{ comparison_summary.total_source_files }}
+      Total archivos en contingencia: {{ comparison_summary.total_target_files }}
+      Archivos faltantes:             {{ comparison_summary.missing_count }}
+      Archivos desactualizados:       {{ comparison_summary.outdated_count }}
+      Archivos idénticos:             {{ comparison_summary.identical_count }}
+
+      DETALLES:
+      ─────────
+
+      ARCHIVOS FALTANTES EN CONTINGENCIA:
+      {% if missing_files | length > 0 %}
+      {% for file in missing_files %}
+      {{ loop.index }}. {{ file.name }}
+         - Ubicación: {{ file.details.path }}
+         - Tamaño: {{ file.details.size }} bytes
+         - Última modificación: {{ file.details.lastwritetime }}
+      {% endfor %}
+      {% else %}
+      No hay archivos faltantes.
+      {% endif %}
+
+      ARCHIVOS DESACTUALIZADOS:
+      {% if outdated_files | length > 0 %}
+      {% for file in outdated_files %}
+      {{ loop.index }}. {{ file.name }}
+         - Fecha en producción: {{ file.source.lastwritetime }}
+         - Fecha en contingencia: {{ file.target.lastwritetime }}
+         - Servidor producción: {{ file.source.server }}
+         - Servidor contingencia: {{ file.target.server }}
+      {% endfor %}
+      {% else %}
+      No hay archivos desactualizados.
+      {% endif %}
+
+      ════════════════════════════════════════════════════════════════
+      Fin del reporte
+      ════════════════════════════════════════════════════════════════
+
+- name: "Mostrar Reporte"
+  ansible.builtin.debug:
+    msg:
+      - "{{ report_content.split('\n') }}"

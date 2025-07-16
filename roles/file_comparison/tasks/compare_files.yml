@@ -1,0 +1,67 @@
+---
+# Comparar archivos entre origen y destino - VERSIÓN CORREGIDA
+# Task ID: {{ task_id }} - {{ task_description }}
+
+- name: "Inicializar variables de comparación"
+  ansible.builtin.set_fact:
+    missing_files: []
+    outdated_files: []
+    identical_files: []
+    comparison_timestamp: "{{ ansible_date_time.iso8601 }}"
+
+- name: "Identificar archivos faltantes en contingencia"
+  ansible.builtin.set_fact:
+    missing_files: "{{ missing_files + [{'name': item.key, 'details': item.value}] }}"
+  loop: "{{ source_files | dict2items }}"
+  when: item.key not in target_files
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Detectar archivos desactualizados"
+  ansible.builtin.set_fact:
+    outdated_files: "{{ outdated_files + [comparison_item] }}"
+  vars:
+    comparison_item:
+      name: "{{ item.key }}"
+      source: "{{ source_files[item.key] }}"
+      target: "{{ target_files[item.key] }}"
+      time_diff_seconds: "{{ (source_files[item.key].lastwritetime - target_files[item.key].lastwritetime) | int }}"
+  loop: "{{ source_files | dict2items }}"
+  when:
+    - item.key in target_files
+    - source_files[item.key].lastwritetime > target_files[item.key].lastwritetime
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Identificar archivos idénticos"
+  ansible.builtin.set_fact:
+    identical_files: "{{ identical_files + [item.key] }}"
+  loop: "{{ source_files | dict2items }}"
+  when:
+    - item.key in target_files
+    - source_files[item.key].checksum == target_files[item.key].checksum
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "Crear resumen detallado de comparación"
+  ansible.builtin.set_fact:
+    comparison_summary:
+      task_id: "{{ file_comparison_task_id }}"
+      task_description: "{{ file_comparison_task_description }}"
+      total_source_files: "{{ source_files | length }}"
+      total_target_files: "{{ target_files | length }}"
+      missing_count: "{{ missing_files | length }}"
+      outdated_count: "{{ outdated_files | length }}"
+      identical_count: "{{ identical_files | length }}"
+      missing_files: "{{ missing_files }}"
+      outdated_files: "{{ outdated_files }}"
+      identical_files: "{{ identical_files }}"
+      source_group: "{{ file_comparison_source_group }}"
+      target_group: "{{ file_comparison_target_group }}"
+      comparison_path: "{{ file_comparison_default_comparison_path }}"
+      timestamp: "{{ comparison_timestamp }}"
+      status: "{{ 'OK' if (missing_files | length == 0 and outdated_files | length == 0) else 'WARNING' }}"
+
+- name: "Marcar comparación como completada"
+  ansible.builtin.set_fact:
+    comparison_completed: true

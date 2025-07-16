@@ -1,0 +1,40 @@
+---
+- name: "Comparación de archivos entre Producción y Contingencia"
+  hosts: servers_origen
+  gather_facts: true
+  strategy: linear
+
+  vars:
+    # Estas variables pueden sobrescribirse desde línea de comandos o AWX
+    file_comparison_task_id: "{{ custom_file_comparison_task_id | default('Paso 1') }}"
+    file_comparison_task_description: "{{ custom_file_comparison_task_description | default('Validacion de Archivos') }}"
+
+  pre_tasks:
+    - name: "Validar ejecución del playbook"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "Iniciando comparación de archivos"
+          - "Task ID: {{ file_comparison_task_id }}"
+          - "Descripción: {{ file_comparison_task_description }}"
+          - "════════════════════════════════════════════"
+      tags: always
+
+  tasks:
+    - name: "Ejecutar role de comparación de archivos"
+      ansible.builtin.include_role:
+        name: file_comparison
+      tags:
+        - comparison
+
+  post_tasks:
+    - name: "Mostrar resumen final"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "Comparación completada"
+          - "Estado: {{ comparison_summary.status | default('UNKNOWN') }}"
+          - "Ver detalles en el reporte generado"
+          - "════════════════════════════════════════════"
+      when: comparison_completed | default(false)
+      tags: always

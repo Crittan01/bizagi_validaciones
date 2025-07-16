@@ -1,0 +1,45 @@
+---
+# tasks file for roles/file_comparison
+
+# Tarea principal del role de comparación de archivos
+# Task ID: {{ file_comparison_task_id }} - {{ file_comparison_task_description }}
+
+- name: "Mostrar información de la tarea"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════════════"
+      - "Ejecutando: {{ file_comparison_task_description }}"
+      - "Task ID: {{ file_comparison_task_id }}"
+      - "Origen: {{ file_comparison_source_group }}"
+      - "Destino: {{ file_comparison_target_group }}"
+      - "Ruta: {{ file_comparison_default_comparison_path }}"
+      - "Patrones: {{ file_comparison_file_patterns | join(', ') }}"
+      - ════════════════════════════════════════════════════
+  run_once: true
+
+- name: "Incluir validación de prerequisitos"
+  ansible.builtin.include_tasks: validate_prerequisites.yml
+  tags:
+    - validation
+
+- name: "Recolectar información de archivos"
+  ansible.builtin.include_tasks: collect_files.yml
+  when: validation_passed | default(false)
+  tags:
+    - collection
+
+- name: "Comparar archivos entre servidores"
+  ansible.builtin.include_tasks: compare_files.yml
+  when:
+    - validation_passed | default(false)
+    - files_collected | default(false)
+  tags:
+    - comparison
+
+- name: "Generar reporte de comparación"
+  ansible.builtin.include_tasks: generate_report.yml
+  when:
+    - validation_passed | default(false)
+    - comparison_completed | default(false)
+  tags:
+    - report
