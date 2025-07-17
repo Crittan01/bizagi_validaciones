@@ -1,7 +1,7 @@
 ---
 # telnet_check.yml
 - name: "Playbook - Prueba Conectividad Telnet"
-  hosts: servers_origen
+  hosts: all_servers
   gather_facts: false
 
   vars:
