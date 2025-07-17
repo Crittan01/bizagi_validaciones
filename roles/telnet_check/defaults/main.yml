@@ -1,6 +1,6 @@
 ---
 # defaults file for roles/telnet_check
-telnet_check_check_type: "telnet"
+telnet_check_check_type: "{{ check_type | default('') }}"
 
 # Hosts destino (debe ser definido en playbook)
 telnet_check_target_hosts: []

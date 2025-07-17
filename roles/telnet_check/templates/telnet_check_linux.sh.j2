@@ -1,25 +1,48 @@
 #!/bin/bash
-# Template Bash para telnet desde Linux
+# Template Bash para conectividad desde Linux
 
 declare -a results=()
 total_tests=0
 success_count=0
 
+{% if check_type in ['telnet', 'both'] %}
+# ===================
+# TESTS TELNET
+# ===================
 {% for host in telnet_check_target_hosts %}
 {% for port in telnet_check_ports %}
 total_tests=$((total_tests + 1))
 
 # Timeout de 5 segundos para telnet
 if timeout 5 bash -c "echo >/dev/tcp/{{ host }}/{{ port }}" 2>/dev/null; then
-    results+=("{{ host }}:{{ port }} = SUCCESS")
+    results+=("TELNET {{ host }}:{{ port }} = SUCCESS")
     success_count=$((success_count + 1))
 else
-    results+=("{{ host }}:{{ port }} = FAILED")
+    results+=("TELNET {{ host }}:{{ port }} = FAILED")
 fi
 
 sleep 0.1
 {% endfor %}
 {% endfor %}
+{% endif %}
+
+{% if check_type in ['ping', 'both'] %}
+# ===================
+# TESTS PING
+# ===================
+{% for host in telnet_check_target_hosts %}
+total_tests=$((total_tests + 1))
+
+if ping -c {{ telnet_check_ping_count }} {{ host }} >/dev/null 2>&1; then
+    results+=("PING {{ host }} = SUCCESS")
+    success_count=$((success_count + 1))
+else
+    results+=("PING {{ host }} = FAILED")
+fi
+
+sleep 0.1
+{% endfor %}
+{% endif %}
 
 # Mostrar resultados
 for result in "${results[@]}"; do

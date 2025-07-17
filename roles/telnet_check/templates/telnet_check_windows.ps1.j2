@@ -1,36 +1,63 @@
-# templates/test_connectivity.ps1.j2
-# Template PowerShell para Test-NetConnection compatible con PowerShell 5.1+
-
+# Template PowerShell para conectividad desde Windows
 $results = @()
 $ErrorActionPreference = "Stop"
 
+{% if check_type in ['telnet', 'both'] %}
+# ===================
+# TESTS TELNET
+# ===================
 {% for host in telnet_check_target_hosts %}
 {% for port in telnet_check_ports %}
 try {
-    Write-Verbose "Test de conexion a {{ host }}:{{ port }}"
+    Write-Verbose "Test telnet a {{ host }}:{{ port }}"
     $test = Test-NetConnection -ComputerName "{{ host }}" -Port {{ port }} -InformationLevel Detailed -WarningAction SilentlyContinue
     
     if ($test.TcpTestSucceeded) {
-        $status = "SUCCESS"
-        $results += "{{ host }}:{{ port }} = SUCCESS"
+        $results += "TELNET {{ host }}:{{ port }} = SUCCESS"
     } else {
-        $results += "{{ host }}:{{ port }} = FAILED"
+        $results += "TELNET {{ host }}:{{ port }} = FAILED"
     }
     
     Start-Sleep -Milliseconds 100
 } catch {
     $errorMsg = $_.Exception.Message -replace '"', "'"
-    $results += "{{ host }}:{{ port }} = ERROR: $errorMsg"
+    $results += "TELNET {{ host }}:{{ port }} = ERROR: $errorMsg"
 }
 {% endfor %}
 {% endfor %}
+{% endif %}
+
+{% if check_type in ['ping', 'both'] %}
+# ===================
+# TESTS PING
+# ===================
+{% for host in telnet_check_target_hosts %}
+try {
+    Write-Verbose "Test ping a {{ host }}"
+    $ping = Test-Connection -ComputerName "{{ host }}" -Count {{ telnet_check_ping_count }} -Quiet -ErrorAction Stop
+    
+    if ($ping) {
+        $results += "PING {{ host }} = SUCCESS"
+    } else {
+        $results += "PING {{ host }} = FAILED"
+    }
+    
+    Start-Sleep -Milliseconds 100
+} catch {
+    $errorMsg = $_.Exception.Message -replace '"', "'"
+    $results += "PING {{ host }} = ERROR: $errorMsg"
+}
+{% endfor %}
+{% endif %}
 
 # Mostrar todos los resultados
 $results | ForEach-Object { Write-Host $_ }
 
-# Resumen:
+# Calcular resumen
 $successCount = ($results | Where-Object { $_ -like "*SUCCESS*" }).Count
-$totalTests = {{ telnet_check_target_hosts | length * telnet_check_ports | length }}
+$telnetTests = {{ telnet_check_target_hosts | length * telnet_check_ports | length if check_type in ['telnet', 'both'] else 0 }}
+$pingTests = {{ telnet_check_target_hosts | length if check_type in ['ping', 'both'] else 0 }}
+$totalTests = $telnetTests + $pingTests
 $successRate = if ($totalTests -gt 0) { [math]::Round(($successCount / $totalTests) * 100, 2) } else { 0 }
 
 Write-Host ""

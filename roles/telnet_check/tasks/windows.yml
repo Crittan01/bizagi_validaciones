@@ -2,7 +2,7 @@
 # tasks file/windows.yml for roles/telnet_check
 - name: "Ejecutar test de conectividad desde Pivote Windows"
   block:
-    - name: "Test conectividad con Test-NetConnection"
+    - name: "Test conectividad {{ check_type }}"
       ansible.windows.win_shell: "{{ lookup('template', 'telnet_check_windows.ps1.j2') }}"
       register: connectivity_test
       retries: "{{ telnet_check_retries }}"

@@ -2,7 +2,7 @@
 # tasks file/linux.yml for roles/telnet_check
 - name: "Ejecutar test de conectividad Linux"
   block:
-    - name: "Test conectividad con Telnet NC/TELNET"
+    - name: "Test conectividad {{ check_type | upper }}"
       ansible.builtin.shell: "{{ lookup('template', 'telnet_check_linux.sh.j2') }}"
       register: connectivity_test
       retries: "{{ telnet_check_retries }}"
