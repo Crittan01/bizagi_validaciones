@@ -33,7 +33,7 @@ sleep 0.1
 {% for host in telnet_check_target_hosts %}
 total_tests=$((total_tests + 1))
 
-if ping -c {{ telnet_check_ping_count }} {{ host }} >/dev/null 2>&1; then
+if ping -c 5 {{ host }} >/dev/null 2>&1; then
     results+=("PING {{ host }} = SUCCESS")
     success_count=$((success_count + 1))
 else

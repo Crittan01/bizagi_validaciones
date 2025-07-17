@@ -34,7 +34,7 @@ try {
 {% for host in telnet_check_target_hosts %}
 try {
     Write-Verbose "Test ping a {{ host }}"
-    $ping = Test-Connection -ComputerName "{{ host }}" -Count {{ telnet_check_ping_count }} -Quiet -ErrorAction Stop
+    $ping = Test-Connection -ComputerName "{{ host }}" -Count 5 -Quiet -ErrorAction Stop
     
     if ($ping) {
         $results += "PING {{ host }} = SUCCESS"
