@@ -2,12 +2,12 @@
 $results = @()
 $ErrorActionPreference = "Stop"
 
-{% if check_type in ['telnet', 'both'] %}
+{% if test_connection_check_type in ['telnet', 'both'] %}
 # ===================
 # TESTS TELNET
 # ===================
-{% for host in telnet_check_target_hosts %}
-{% for port in telnet_check_ports %}
+{% for host in test_connection_target_hosts %}
+{% for port in test_connection_ports %}
 try {
     Write-Verbose "Test telnet a {{ host }}:{{ port }}"
     $test = Test-NetConnection -ComputerName "{{ host }}" -Port {{ port }} -InformationLevel Detailed -WarningAction SilentlyContinue
@@ -27,11 +27,11 @@ try {
 {% endfor %}
 {% endif %}
 
-{% if check_type in ['ping', 'both'] %}
+{% if test_connection_check_type in ['ping', 'both'] %}
 # ===================
 # TESTS PING
 # ===================
-{% for host in telnet_check_target_hosts %}
+{% for host in test_connection_target_hosts %}
 try {
     Write-Verbose "Test ping a {{ host }}"
     $ping = Test-Connection -ComputerName "{{ host }}" -Count 5 -Quiet -ErrorAction Stop
@@ -55,8 +55,8 @@ $results | ForEach-Object { Write-Host $_ }
 
 # Calcular resumen
 $successCount = ($results | Where-Object { $_ -like "*SUCCESS*" }).Count
-$telnetTests = {{ telnet_check_target_hosts | length * telnet_check_ports | length if check_type in ['telnet', 'both'] else 0 }}
-$pingTests = {{ telnet_check_target_hosts | length if check_type in ['ping', 'both'] else 0 }}
+$telnetTests = {{ test_connection_target_hosts | length * test_connection_ports | length if test_connection_check_type in ['telnet', 'both'] else 0 }}
+$pingTests = {{ test_connection_target_hosts | length if test_connection_check_type in ['ping', 'both'] else 0 }}
 $totalTests = $telnetTests + $pingTests
 $successRate = if ($totalTests -gt 0) { [math]::Round(($successCount / $totalTests) * 100, 2) } else { 0 }
 

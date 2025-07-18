@@ -5,12 +5,12 @@ declare -a results=()
 total_tests=0
 success_count=0
 
-{% if check_type in ['telnet', 'both'] %}
+{% if test_connection_check_type in ['telnet', 'both'] %}
 # ===================
 # TESTS TELNET
 # ===================
-{% for host in telnet_check_target_hosts %}
-{% for port in telnet_check_ports %}
+{% for host in test_connection_target_hosts %}
+{% for port in test_connection_ports %}
 total_tests=$((total_tests + 1))
 
 # Timeout de 5 segundos para telnet
@@ -26,11 +26,11 @@ sleep 0.1
 {% endfor %}
 {% endif %}
 
-{% if check_type in ['ping', 'both'] %}
+{% if test_connection_check_type in ['ping', 'both'] %}
 # ===================
 # TESTS PING
 # ===================
-{% for host in telnet_check_target_hosts %}
+{% for host in test_connection_target_hosts %}
 total_tests=$((total_tests + 1))
 
 if ping -c 5 {{ host }} >/dev/null 2>&1; then

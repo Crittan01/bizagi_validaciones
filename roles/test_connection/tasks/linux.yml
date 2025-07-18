@@ -1,12 +1,12 @@
 ---
-# tasks file/linux.yml for roles/telnet_check
+# tasks file/linux.yml for roles/test_connection
 - name: "Ejecutar test de conectividad Linux"
   block:
-    - name: "Test conectividad {{ check_type | upper }}"
-      ansible.builtin.shell: "{{ lookup('template', 'telnet_check_linux.sh.j2') }}"
+    - name: "Test conectividad [{{ test_connection_check_type | capitalize }}]"
+      ansible.builtin.shell: "{{ lookup('template', 'test_connection_linux.sh.j2') }}"
       register: connectivity_test
-      retries: "{{ telnet_check_retries }}"
-      delay: "{{ telnet_check_retry_delay }}"
+      retries: "{{ test_connection_retries }}"
+      delay: "{{ test_connection_retry_delay }}"
       until: connectivity_test is defined
       changed_when: false
       # noqa: command-instead-of-shell
@@ -33,7 +33,7 @@
   ansible.builtin.set_fact:
     connectivity_result:
       start_time: "{{ ansible_date_time.date }} - {{ ansible_date_time.time }}"
-      task_id: "{{ telnet_check_task_id }}"
+      task_id: "{{ test_connection_task_id }}"
       source_host: "{{ inventory_hostname }}"
       results: "{{ connectivity_test.stdout_lines }}"
       status: "{{ 'success' if 'FAILED' not in connectivity_test.stdout else 'failed' }}"
@@ -49,11 +49,11 @@
 # Metadata de la task
 - name: "Preparar datos de la task"
   ansible.builtin.set_fact:
-    task_key: "task_{{ telnet_check_task_id }}"
+    task_key: "task_{{ test_connection_task_id }}"
     task_info:
-      task_id: "{{ telnet_check_task_id }}"
-      description: "{{ telnet_check_task_description }}"
-      target: "{{ telnet_check_target_hosts | join(',') }}:{{ telnet_check_ports | join(',') }}"
+      task_id: "{{ test_connection_task_id }}"
+      description: "{{ test_connection_task_description }}"
+      target: "{{ test_connection_target_hosts | join(',') }}:{{ test_connection_ports | join(',') }}"
       execution_time: "{{ ansible_date_time.iso8601 }}"
 
 # Registrar en AWX (set_stats)
