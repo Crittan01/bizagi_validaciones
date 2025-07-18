@@ -40,6 +40,7 @@
           - task_ports_input | regex_search('^[0-9]{1,5}$')
         fail_msg: "ERROR: El PUERTO deber un numero de 1 a 5 digitos (Ej: 5985)."
         success_msg: "OK: Puerto valido"
+      when: check_type == 'telnet'
 
 - name: "Playbook - Prueba Conectividad"
   hosts: all_servers
