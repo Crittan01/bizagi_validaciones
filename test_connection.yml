@@ -5,14 +5,23 @@
 
   vars:
     # variables a nivel playbook
+    execution: "{{ execution_hosts | default('localhost') }}"
     task_targets: "{{ (task_targets_input | default('') | split('\n')) | select('truthy') | list }}"
     check_type: "{{ test_connection_check_type | default('') }}"
 
   tasks:
+    - name: Validar que se definió execution
+      ansible.builtin.assert:
+        that:
+          - execution != 'localhost'
+          - execution | length > 0
+        fail_msg: "ERROR: Debes definir el grupo de hosts"
+        success_msg: "OK: Host Objetivos definido como '{{ execution }}'"
+
     - name: "Validar si hay targets configurados"
       ansible.builtin.debug:
         msg:
-          - "Targets: {{ task_targets | length }} configurados"
+          - "Servidores Objetivos: {{ task_targets | length }} configurados"
           - "Tipo: {{ check_type }}"
 
     - name: "(INFORMATIVO) - Validar parámetros requeridos"
@@ -43,7 +52,7 @@
       when: check_type in ['telnet', 'ambos']
 
 - name: "Playbook - Prueba Conectividad"
-  hosts: all_servers
+  hosts: "{{ execution_hosts | default([]) }}"
   gather_facts: false
 
   vars:
