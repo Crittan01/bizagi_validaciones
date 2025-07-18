@@ -1,13 +1,22 @@
 ---
 # tasks/generate_stats.yml
+- name: "Establecer sync_status por defecto si no existe"
+  ansible.builtin.set_fact:
+    sync_status:
+      completed: false
+      success: false
+      message: "Sincronización no ejecutada"
+      timestamp: "{{ ansible_date_time.iso8601 }}"
+  when: sync_status is not defined
+
 - name: "Crear estadísticas finales"
   ansible.builtin.set_fact:
     final_stats:
       task_id: "{{ file_sync_task_id }}"
       description: "{{ file_sync_description }}"
       metrics: "{{ sync_metrics }}"
-      sync_executed: "{{ file_sync_execute_copy }}"
-      sync_status: "{{ sync_status | default({'completed': false}) }}"
+      sync_executed: "{{ file_sync_execute_copy | bool }}"
+      sync_status: "{{ sync_status }}"
       timestamp: "{{ ansible_date_time.iso8601 }}"
 
 - name: "Crear nombre de variable válido"
@@ -20,7 +29,9 @@
       "{{ task_key_clean }}":
         task_info: "{{ final_stats }}"
         host: "{{ inventory_hostname }}"
-        status: "{{ 'success' if not sync_metrics.sync_required or sync_status.completed else 'failed' }}"
+        status:
+          "{{ 'success' if (not sync_metrics.sync_required or (sync_status.completed | default(false)))
+          else 'analysis_only' if not (file_sync_execute_copy | bool) else 'failed' }}"
       sync_summary:
         task_id: "{{ file_sync_task_id }}"
         total_files_source: "{{ sync_metrics.total_source | int }}"
@@ -28,7 +39,7 @@
         files_missing: "{{ sync_metrics.missing_count | int }}"
         files_outdated: "{{ sync_metrics.outdated_count | int }}"
         sync_required: "{{ sync_metrics.sync_required }}"
-        sync_executed: "{{ file_sync_execute_copy }}"
+        sync_executed: "{{ file_sync_execute_copy | bool }}"
         timestamp: "{{ ansible_date_time.iso8601 }}"
     per_host: false
 
@@ -40,6 +51,8 @@
       - "════════════════════════════════════════════"
       - "Variable: {{ task_key_clean }}"
       - "Task ID: {{ final_stats.task_id }}"
-      - "Status: {{ 'success' if not sync_metrics.sync_required or sync_status.completed else 'failed' }}"
+      - "Modo: {{ 'Solo Análisis' if not (file_sync_execute_copy | bool) else 'Análisis + Sincronización' }}"
+      - "Status: {{ 'success' if (not sync_metrics.sync_required or (sync_status.completed | default(false)))
+        else 'analysis_only' if not (file_sync_execute_copy | bool) else 'failed' }}"
       - "Sincronización requerida: {{ sync_metrics.sync_required }}"
       - "════════════════════════════════════════════"
