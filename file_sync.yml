@@ -1,0 +1,22 @@
+---
+# file_sync.yml
+- name: "Sincronización de Archivos Prod → Cont"
+  hosts: "{{ source_environment | default('windows_produccion') }}"
+  gather_facts: true
+
+  vars:
+    sync_task_id: "{{ custom_sync_task_id | default('sync_0.3') }}"
+    sync_description: "{{ custom_sync_description | default('Sincronización Prod-Cont') }}"
+
+  tasks:
+    - name: "Ejecutar sincronización"
+      ansible.builtin.include_role:
+        name: file_sync
+      vars:
+        file_sync_task_id: "{{ sync_task_id }}"
+        file_sync_description: "{{ sync_description }}"
+        file_sync_source_group: "{{ source_environment | default('windows_produccion') }}"
+        file_sync_target_group: "{{ target_environment | default('windows_contingencia') }}"
+        file_sync_comparison_path: "{{ sync_path | default('D:\\Mis Documentos') }}"
+        file_sync_file_patterns: "{{ sync_patterns | default(['*.bat', '*.ps1']) }}"
+        file_sync_execute_copy: "{{ enable_sync | default(false) }}"

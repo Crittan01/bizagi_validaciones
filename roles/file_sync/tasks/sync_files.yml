@@ -1,0 +1,107 @@
+---
+# tasks/sync_files.yml
+- name: "Verificar si hay archivos para sincronizar"
+  ansible.builtin.debug:
+    msg:
+      - "═════════════════════════════════════════"
+      - "INFORMACIÓN"
+      - "═════════════════════════════════════════"
+      - "No hay archivos para sincronizar"
+      - "Todos los archivos están actualizados"
+      - "═════════════════════════════════════════"
+  when: not sync_metrics.sync_required
+
+- name: "Mostrar archivos que se van a sincronizar"
+  ansible.builtin.debug:
+    msg:
+      - "═════════════════════════════════════════"
+      - "INICIANDO SINCRONIZACIÓN"
+      - "═════════════════════════════════════════"
+      - "Archivos faltantes: {{ sync_metrics.missing_count }}"
+      - "Archivos desactualizados: {{ sync_metrics.outdated_count }}"
+      - "Total a sincronizar: {{ sync_metrics.files_to_sync }}"
+      - "═════════════════════════════════════════"
+  when: sync_metrics.sync_required
+
+- name: "Ejecutar sincronización"
+  when: sync_metrics.sync_required
+  block:
+    - name: "Sincronizar con robocopy"
+      community.windows.win_robocopy:
+        src: "{{ file_sync_comparison_path }}"
+        dest: "\\\\{{ hostvars[groups[file_sync_target_group][0]].ansible_host }}\\D$\\Mis Documentos"
+        flags: "{{ file_sync_robocopy_flags }}"
+      register: sync_result
+
+    - name: "Validar resultado de sincronización"
+      ansible.builtin.set_fact:
+        sync_status:
+          completed: true
+          success: "{{ sync_result.rc == 0 or sync_result.rc == 1 }}"
+          message: "{{ sync_result.msg }}"
+          files_copied: "{{ sync_metrics.files_to_sync }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+          return_code: "{{ sync_result.rc | default(99) }}"
+
+    - name: "Mostrar reporte visual de sincronización"
+      ansible.builtin.debug:
+        msg:
+          - "╔═══════════════════════════════════════════════════════════════"
+          - "║           REPORTE DE SINCRONIZACIÓN DE ARCHIVOS               "
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ Task: {{ file_sync_description }}"
+          - "║ ID: {{ file_sync_task_id }}"
+          - "║ Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}"
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ RESUMEN DE RESULTADOS:"
+          - "║ Total archivos en producción:    {{ sync_metrics.total_source }}"
+          - "║"
+          - "║ Total archivos en contingencia:  {{ sync_metrics.total_target }}"
+          - "║ Archivos faltantes copiados:     {{ sync_metrics.missing_count }}"
+          - "║ Archivos desactualizados:        {{ sync_metrics.outdated_count }}"
+          - "║ Total archivos sincronizados:    {{ sync_metrics.files_to_sync }}"
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ RESULTADO: {{ 'EXITOSO' if sync_status.success else 'FALLÓ' }}"
+          - "║ Mensaje: {{ sync_status.message }}"
+          - "╚═══════════════════════════════════════════════════════════════"
+
+    - name: "Mostrar detalles de archivos sincronizados"
+      ansible.builtin.debug:
+        msg:
+          - "═════════════════════════════════════════"
+          - "ARCHIVOS SINCRONIZADOS"
+          - "═════════════════════════════════════════"
+          - "{% if missing_files | length > 0 %}ARCHIVOS COPIADOS (faltantes):{% for file in missing_files %}  {{ file }}{% endfor %}{% endif %}"
+          - "{% if outdated_files | length > 0 %}ARCHIVOS ACTUALIZADOS:{% for file in outdated_files %}  {{ file }}{% endfor %}{% endif %}"
+          - "═════════════════════════════════════════"
+      when: sync_status.success
+
+    - name: "Mostrar error de sincronización"
+      ansible.builtin.debug:
+        msg:
+          - "═════════════════════════════════════════"
+          - "ERROR EN SINCRONIZACIÓN"
+          - "═════════════════════════════════════════"
+          - "Código: {{ sync_status.return_code }}"
+          - "Mensaje: {{ sync_status.message }}"
+          - "═════════════════════════════════════════"
+      when: not sync_status.success
+
+  rescue:
+    - name: "Manejar error de sincronización"
+      ansible.builtin.set_fact:
+        sync_status:
+          completed: false
+          success: false
+          message: "{{ ansible_failed_result.msg | default('Error de sincronización') }}"
+          timestamp: "{{ ansible_date_time.iso8601 }}"
+
+    - name: "Mostrar error capturado"
+      ansible.builtin.debug:
+        msg:
+          - "╔═══════════════════════════════════════════════════════════════"
+          - "║              ERROR DE SINCRONIZACIÓN                          "
+          - "╠═══════════════════════════════════════════════════════════════"
+          - "║ {{ sync_status.message }}"
+          - "║ La sincronización no pudo completarse"
+          - "╚═══════════════════════════════════════════════════════════════"

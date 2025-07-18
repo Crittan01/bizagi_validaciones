@@ -1,0 +1,55 @@
+---
+# tasks/validate_prerequisites.yml
+- name: "Validar grupos definidos"
+  ansible.builtin.assert:
+    that:
+      - groups[file_sync_source_group] is defined
+      - groups[file_sync_target_group] is defined
+      - groups[file_sync_source_group] | length > 0
+      - groups[file_sync_target_group] | length > 0
+    fail_msg: "Grupos {{ file_sync_source_group }} o {{ file_sync_target_group }} no definidos"
+    success_msg: "OK: Grupos validados correctamente"
+
+- name: "Verificar conectividad destino"
+  ansible.windows.win_ping:
+  delegate_to: "{{ groups[file_sync_target_group][0] }}"
+  register: target_connectivity
+
+- name: "Validar ruta origen"
+  ansible.windows.win_stat:
+    path: "{{ file_sync_comparison_path }}"
+  register: source_path_check
+
+- name: "Verificar ruta origen existe"
+  ansible.builtin.assert:
+    that:
+      - source_path_check.stat.exists
+      - source_path_check.stat.isdir
+    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en origen"
+    success_msg: "OK: Ruta origen validada"
+
+- name: "Validar ruta destino"
+  ansible.windows.win_stat:
+    path: "{{ file_sync_comparison_path }}"
+  delegate_to: "{{ groups[file_sync_target_group][0] }}"
+  register: target_path_check
+
+- name: "Verificar ruta destino existe"
+  ansible.builtin.assert:
+    that:
+      - target_path_check.stat.exists
+      - target_path_check.stat.isdir
+    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en destino"
+    success_msg: "OK: Ruta destino validada"
+
+- name: "Mostrar resumen de validación"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════"
+      - "VALIDACIÓN COMPLETADA"
+      - "════════════════════════════════════════════"
+      - "Origen: {{ inventory_hostname }}"
+      - "Destino: {{ groups[file_sync_target_group][0] }}"
+      - "Ruta: {{ file_sync_comparison_path }}"
+      - "Conectividad: OK"
+      - "════════════════════════════════════════════"
