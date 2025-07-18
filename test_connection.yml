@@ -16,7 +16,7 @@
           - execution != 'localhost'
           - execution | length > 0
         fail_msg: "ERROR: Debes definir el grupo de hosts"
-        success_msg: "OK: Host objetivos definido como '{{ execution }}'"
+        success_msg: "OK: Host Pivote definido como '{{ execution }}'"
 
     - name: "Validar si hay targets configurados"
       ansible.builtin.debug:
@@ -59,7 +59,7 @@
     # variables a nivel playbook
     task_targets: "{{ (task_targets_input | default('')) | split('\n') | list }}"
     task_ports: "{{ (task_ports_input | default('')) | split('\n') | list }}"
-    task_id: "{{ custom_task_id | default('Conexion') }}"
+    task_id: "{{ task_id_input | default('conexion') }}"
     task_description: "Prueba Conectividad Telnet/Ping"
 
   pre_tasks:
