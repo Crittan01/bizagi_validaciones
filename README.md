@@ -242,7 +242,7 @@ Este proyecto es para uso interno de automatización.
 
 ---
 
-**Autor**: cgarzont (NTTDATA)
+**Autor**: cgarzont (NTTDATA)  
 **Versión**: 1.0.0  
 **Última actualización**: Julio 2025  
 **Mantenedor**: Equipo Automatizacion NTTDATA

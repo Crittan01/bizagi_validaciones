@@ -400,7 +400,7 @@ roles/test_connection/
 
 ---
 
-**Autor**: cgarzont (NTTDATA)
+**Autor**: cgarzont (NTTDATA)  
 **Versión del Rol**: 1.0.0  
 **Compatibilidad**: Ansible 2.9+, AWX 15.0+  
 **Mantenedor**: Equipo Automatizacion NTTDATA
