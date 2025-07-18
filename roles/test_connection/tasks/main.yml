@@ -9,21 +9,8 @@
       - "Desde: {{ inventory_hostname }}"
       - "Tipo: {{ test_connection_check_type }}"
       - "Destinos: {{ test_connection_target_hosts | join(', ') }}"
-      - "Puertos: {{ test_connection_ports | default(['N/A']) | join(', ') }}"
+      - "Puertos: {{ (test_connection_check_type in ['telnet', 'ambos']) | ternary(test_connection_ports | join(', '), 'N/A') }}"
       - "===================================="
-  when: test_connection_check_type == 'telnet'
-
-- name: "Mostrar configuración de la prueba Ping"
-  ansible.builtin.debug:
-    msg:
-      - "===================================="
-      - "TAREA {{ test_connection_task_id }}: {{ test_connection_task_description }}"
-      - "===================================="
-      - "Desde: {{ inventory_hostname }}"
-      - "Tipo: {{ test_connection_check_type }}"
-      - "Destinos: {{ test_connection_target_hosts | join(', ') }}"
-      - "===================================="
-  when: test_connection_check_type == 'ping'
 
 - name: Ejecutar Test Windows
   ansible.builtin.include_tasks:
