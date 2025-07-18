@@ -1,6 +1,6 @@
 ---
 # tasks file for roles/test_connection
-- name: "Mostrar configuración de la prueba Telnet"
+- name: "Mostrar configuración de la prueba de Conexion"
   ansible.builtin.debug:
     msg:
       - "===================================="
