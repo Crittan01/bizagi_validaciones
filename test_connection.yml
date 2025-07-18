@@ -16,7 +16,7 @@
           - execution != 'localhost'
           - execution | length > 0
         fail_msg: "ERROR: Debes definir el grupo de hosts"
-        success_msg: "OK: Host Objetivos definido como '{{ execution }}'"
+        success_msg: "OK: Host objetivos definido como '{{ execution }}'"
 
     - name: "Validar si hay targets configurados"
       ansible.builtin.debug:
