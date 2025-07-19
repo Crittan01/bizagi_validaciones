@@ -1,13 +1,12 @@
 ---
-# defaults file for roles/file_sync
+# defaults/main.yml for roles/file_sync
 
-# Configuración por defecto
 file_sync_task_id: "sync_task"
 file_sync_description: "File synchronization"
 
-# Grupos de servidores
-file_sync_source_group: "windows_produccion"
-file_sync_target_group: "windows_contingencia"
+# Servidores específicos (reemplaza grupos)
+file_sync_source_server: ""
+file_sync_target_server: ""
 
 # Configuración de archivos
 file_sync_comparison_path: "D:\\Mis Documentos"

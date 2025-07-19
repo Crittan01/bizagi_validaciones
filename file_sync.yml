@@ -1,12 +1,121 @@
 ---
-# file_sync.yml
-- name: "Sincronización de Archivos Prod → Cont"
-  hosts: "{{ source_environment | default('windows_produccion') }}"
+# Play 1: Validaciones en localhost
+- name: "Validaciones de Parámetros"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    sync_path: "{{ sync_path if sync_path is defined else sync_path_input | default('') }}"
+
+  tasks:
+    - name: "(INFORMATIVO) - Validar parámetros básicos requeridos"
+      ansible.builtin.assert:
+        that:
+          - source_server is defined
+          - source_server | length > 0
+          - target_server is defined
+          - target_server | length > 0
+          - source_server != target_server
+        fail_msg: |
+          ERROR: Debes definir servidores origen y destino válidos:
+          - source_server: Servidor origen (ej: windows_prod)
+          - target_server: Servidor destino (ej: windows_cont)
+          - Deben ser diferentes entre sí
+          - Origen actual: "{{ source_server | default('NO DEFINIDO') }}"
+          - Destino actual: "{{ target_server | default('NO DEFINIDO') }}"
+        success_msg: "OK: Servidores definidos - {{ source_server }} → {{ target_server }}"
+
+    - name: "(INFORMATIVO) - Validar que servidor origen existe en inventario"
+      ansible.builtin.assert:
+        that:
+          - source_server in groups['all']
+        fail_msg: |
+          ERROR: El servidor origen no existe en el inventario:
+          - Servidor buscado: "{{ source_server }}"
+          - Servidores disponibles: {{ groups['all'] | join(', ') }}
+        success_msg: "OK: Servidor origen encontrado en inventario"
+
+    - name: "(INFORMATIVO) - Validar que servidor destino existe en inventario"
+      ansible.builtin.assert:
+        that:
+          - target_server in groups['all']
+        fail_msg: |
+          ERROR: El servidor destino no existe en el inventario:
+          - Servidor buscado: "{{ target_server }}"
+          - Servidores disponibles: {{ groups['all'] | join(', ') }}
+        success_msg: "OK: Servidor destino encontrado en inventario"
+
+    - name: "(INFORMATIVO) - Validar que ambos servidores sean Windows"
+      ansible.builtin.assert:
+        that:
+          - source_server in groups['windows_servers'] | default([])
+          - target_server in groups['windows_servers'] | default([])
+        fail_msg: |
+          ERROR: Ambos servidores deben ser parte del grupo Windows:
+          - Origen {{ source_server }}: {{ 'OK' if source_server in groups['windows_servers'] | default([]) else 'NO está en windows_servers' }}
+          - Destino {{ target_server }}: {{ 'OK' if target_server in groups['windows_servers'] | default([]) else 'NO está en windows_servers' }}
+          - Servidores Windows disponibles: {{ groups['windows_servers'] | default([]) | join(', ') }}
+        success_msg: "OK: Ambos servidores son Windows válidos"
+
+    - name: "(INFORMATIVO) - Validar estructura de ruta Windows"
+      ansible.builtin.assert:
+        that:
+          - sync_path is defined
+          - sync_path | length > 0
+          - sync_path is match('^[A-Za-z]:\\\\.*')
+          - sync_path is not match('.*[<>"|?*].*')
+          - sync_path is not match('.*/.*')
+          - sync_path | length <= 260
+        fail_msg: |
+          ERROR: La ruta debe cumplir con formato Windows válido:
+          - Debe iniciar con letra de unidad seguida de :\ (ej: C:\, D:\)
+          - Usar BACKSLASH (\) no forward slash (/)
+          - No puede contener caracteres inválidos: < > " | ? *
+          - Máximo 260 caracteres
+          - Ejemplo CORRECTO: "D:\Mis Documentos"
+          - Ejemplo INCORRECTO: "D:/Mis Documentos"
+          - Ruta actual: "{{ sync_path | default('NO DEFINIDA') }}"
+        success_msg: "OK: Ruta Windows válida: {{ sync_path }}"
+
+    - name: "Procesar patrones correctamente"
+      ansible.builtin.set_fact:
+        sync_patterns_processed: >-
+          {%- if sync_patterns is defined -%}
+            {%- if sync_patterns is string -%}
+              {%- if sync_patterns.startswith('[') and sync_patterns.endswith(']') -%}
+                {{ sync_patterns | from_json }}
+              {%- else -%}
+                {{ [sync_patterns] }}
+              {%- endif -%}
+            {%- else -%}
+              {{ sync_patterns }}
+            {%- endif -%}
+          {%- else -%}
+            []
+          {%- endif -%}
+
+    - name: "Mostrar resumen de validación"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "VALIDACIONES COMPLETADAS"
+          - "════════════════════════════════════════════"
+          - "Origen: {{ source_server }}"
+          - "Destino: {{ target_server }}"
+          - "Ruta: {{ sync_path }}"
+          - "Patrones: {{ sync_patterns_processed | join(', ') }}"
+          - "Tipo patrones: {{ sync_patterns_processed | type_debug }}"
+          - "Dirección: {{ source_server }} → {{ target_server }}"
+          - "════════════════════════════════════════════"
+
+# Play 2: Ejecución del rol en servidor origen
+- name: "Sincronización de Archivos Específicos"
+  hosts: "{{ source_server | default([]) }}"
   gather_facts: true
 
   vars:
     sync_task_id: "{{ custom_sync_task_id | default('sync_0.3') }}"
-    sync_description: "{{ custom_sync_description | default('Sincronización Prod-Cont') }}"
+    sync_description: "{{ custom_sync_description | default('Sincronización Específica') }}"
 
   tasks:
     - name: "Ejecutar sincronización"
@@ -15,8 +124,8 @@
       vars:
         file_sync_task_id: "{{ sync_task_id }}"
         file_sync_description: "{{ sync_description }}"
-        file_sync_source_group: "{{ source_environment | default('windows_produccion') }}"
-        file_sync_target_group: "{{ target_environment | default('windows_contingencia') }}"
-        file_sync_comparison_path: "{{ sync_path | default('D:\\Mis Documentos') }}"
-        file_sync_file_patterns: "{{ sync_patterns | default(['*.bat', '*.ps1']) }}"
+        file_sync_source_server: "{{ source_server }}"
+        file_sync_target_server: "{{ target_server }}"
+        file_sync_comparison_path: "{{ sync_path }}"
+        file_sync_file_patterns: "{{ hostvars['localhost']['sync_patterns_processed'] }}"
         file_sync_execute_copy: "{{ enable_sync | default(false) }}"

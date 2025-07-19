@@ -5,7 +5,7 @@
     paths: "{{ file_sync_comparison_path }}"
     patterns: "{{ file_sync_file_patterns }}"
     recurse: false
-  delegate_to: "{{ groups[file_sync_target_group][0] }}"
+  delegate_to: "{{ file_sync_target_server }}"
   register: target_files_raw
 
 - name: "Procesar archivos destino"
@@ -19,7 +19,7 @@
             'size': file.size,
             'checksum': file.checksum | default('N/A'),
             'lastwritetime': file.lastwritetime,
-            'server': groups[file_sync_target_group][0]
+            'server': file_sync_target_server
           }
         }) -%}
       {%- endfor -%}
@@ -28,6 +28,6 @@
 - name: "Mostrar archivos encontrados en destino"
   ansible.builtin.debug:
     msg:
-      - "Archivos en destino: {{ target_files | length }}"
-      - "{% for filename in target_files.keys() %}{{ filename }}{% endfor %}"
+      - "Archivos en {{ file_sync_target_server }}: {{ target_files | length }}"
+      - "{% for filename in target_files.keys() %}{{ filename }}{% if not loop.last %}, {% endif %}{% endfor %}"
   when: target_files | length > 0

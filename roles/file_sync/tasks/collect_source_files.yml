@@ -18,7 +18,7 @@
             'size': file.size,
             'checksum': file.checksum | default('N/A'),
             'lastwritetime': file.lastwritetime,
-            'server': inventory_hostname
+            'server': file_sync_source_server
           }
         }) -%}
       {%- endfor -%}
@@ -27,6 +27,6 @@
 - name: "Mostrar archivos encontrados en origen"
   ansible.builtin.debug:
     msg:
-      - "Archivos en origen: {{ source_files | length }}"
-      - "{% for filename in source_files.keys() %}{{ filename }}{% endfor %}"
+      - "Archivos en {{ file_sync_source_server }}: {{ source_files | length }}"
+      - "{% for filename in source_files.keys() %}{{ filename }}{% if not loop.last %}, {% endif %}{% endfor %}"
   when: source_files | length > 0

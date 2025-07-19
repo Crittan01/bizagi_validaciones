@@ -1,5 +1,33 @@
 ---
-# tasks file for roles/file_sync
+# tasks/main.yml
+- name: "(FAIL) - Validar parámetros requeridos"
+  ansible.builtin.fail:
+    msg: "Parámetro requerido faltante: {{ item }}"
+  when: vars[item] is not defined or vars[item] | length == 0
+  loop:
+    - file_sync_source_server
+    - file_sync_target_server
+    - file_sync_comparison_path
+    - file_sync_file_patterns
+
+- name: "Mostrar configuración de la sincronización"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════"
+      - "CONFIGURACIÓN DE SINCRONIZACIÓN"
+      - "════════════════════════════════════════════"
+      - "Task ID: {{ file_sync_task_id }}"
+      - "Descripción: {{ file_sync_description }}"
+      - "────────────────────────────────────────────"
+      - "Origen:  {{ file_sync_source_server }}"
+      - "Destino: {{ file_sync_target_server }}"
+      - "Ruta:    {{ file_sync_comparison_path }}"
+      - "Patrones: {{ file_sync_file_patterns | join(', ') }}"
+      - "Tipo patrones: {{ file_sync_file_patterns | type_debug }}"
+      - "────────────────────────────────────────────"
+      - "Modo: {{ 'Análisis + Sincronización' if file_sync_execute_copy else 'Solo Análisis' }}"
+      - "════════════════════════════════════════════"
+
 - name: "Validar prerequisitos"
   ansible.builtin.include_tasks: validate_prerequisites.yml
   tags: [validation, always]

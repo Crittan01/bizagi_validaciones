@@ -1,18 +1,23 @@
 ---
 # tasks/validate_prerequisites.yml
-- name: "Validar grupos definidos"
+- name: "Validar servidores definidos"
   ansible.builtin.assert:
     that:
-      - groups[file_sync_source_group] is defined
-      - groups[file_sync_target_group] is defined
-      - groups[file_sync_source_group] | length > 0
-      - groups[file_sync_target_group] | length > 0
-    fail_msg: "Grupos {{ file_sync_source_group }} o {{ file_sync_target_group }} no definidos"
-    success_msg: "OK: Grupos validados correctamente"
+      - file_sync_source_server is defined
+      - file_sync_source_server | length > 0
+      - file_sync_target_server is defined
+      - file_sync_target_server | length > 0
+      - file_sync_source_server != file_sync_target_server
+    fail_msg: "Servidores origen y destino deben estar definidos y ser diferentes"
+    success_msg: "OK: Servidores validados {{ file_sync_source_server }} → {{ file_sync_target_server }}"
 
-- name: "Verificar conectividad destino"
+- name: "Verificar conectividad a servidor origen"
   ansible.windows.win_ping:
-  delegate_to: "{{ groups[file_sync_target_group][0] }}"
+  register: source_connectivity
+
+- name: "Verificar conectividad a servidor destino"
+  ansible.windows.win_ping:
+  delegate_to: "{{ file_sync_target_server }}"
   register: target_connectivity
 
 - name: "Validar ruta origen"
@@ -25,13 +30,13 @@
     that:
       - source_path_check.stat.exists
       - source_path_check.stat.isdir
-    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en origen"
-    success_msg: "OK: Ruta origen validada"
+    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en servidor origen {{ file_sync_source_server }}"
+    success_msg: "OK: Ruta origen validada en {{ file_sync_source_server }}"
 
 - name: "Validar ruta destino"
   ansible.windows.win_stat:
     path: "{{ file_sync_comparison_path }}"
-  delegate_to: "{{ groups[file_sync_target_group][0] }}"
+  delegate_to: "{{ file_sync_target_server }}"
   register: target_path_check
 
 - name: "Verificar ruta destino existe"
@@ -39,8 +44,8 @@
     that:
       - target_path_check.stat.exists
       - target_path_check.stat.isdir
-    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en destino"
-    success_msg: "OK: Ruta destino validada"
+    fail_msg: "Ruta {{ file_sync_comparison_path }} no existe en servidor destino {{ file_sync_target_server }}"
+    success_msg: "OK: Ruta destino validada en {{ file_sync_target_server }}"
 
 - name: "Mostrar resumen de validación"
   ansible.builtin.debug:
@@ -48,8 +53,9 @@
       - "════════════════════════════════════════════"
       - "VALIDACIÓN COMPLETADA"
       - "════════════════════════════════════════════"
-      - "Origen: {{ inventory_hostname }}"
-      - "Destino: {{ groups[file_sync_target_group][0] }}"
+      - "Origen: {{ file_sync_source_server }}"
+      - "Destino: {{ file_sync_target_server }}"
       - "Ruta: {{ file_sync_comparison_path }}"
-      - "Conectividad: OK"
+      - "Conectividad Origen: OK"
+      - "Conectividad Destino: OK"
       - "════════════════════════════════════════════"

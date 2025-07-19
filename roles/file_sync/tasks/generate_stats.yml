@@ -7,6 +7,8 @@
       success: false
       message: "Sincronización no ejecutada"
       timestamp: "{{ ansible_date_time.iso8601 }}"
+      source_server: "{{ file_sync_source_server }}"
+      target_server: "{{ file_sync_target_server }}"
   when: sync_status is not defined
 
 - name: "Crear estadísticas finales"
@@ -14,6 +16,9 @@
     final_stats:
       task_id: "{{ file_sync_task_id }}"
       description: "{{ file_sync_description }}"
+      source_server: "{{ file_sync_source_server }}"
+      target_server: "{{ file_sync_target_server }}"
+      sync_path: "{{ file_sync_comparison_path }}"
       metrics: "{{ sync_metrics }}"
       sync_executed: "{{ file_sync_execute_copy | bool }}"
       sync_status: "{{ sync_status }}"
@@ -34,12 +39,16 @@
           else 'analysis_only' if not (file_sync_execute_copy | bool) else 'failed' }}"
       sync_summary:
         task_id: "{{ file_sync_task_id }}"
+        source_server: "{{ file_sync_source_server }}"
+        target_server: "{{ file_sync_target_server }}"
+        sync_path: "{{ file_sync_comparison_path }}"
         total_files_source: "{{ sync_metrics.total_source | int }}"
         total_files_target: "{{ sync_metrics.total_target | int }}"
         files_missing: "{{ sync_metrics.missing_count | int }}"
         files_outdated: "{{ sync_metrics.outdated_count | int }}"
         sync_required: "{{ sync_metrics.sync_required }}"
         sync_executed: "{{ file_sync_execute_copy | bool }}"
+        sync_successful: "{{ sync_status.success | default(false) }}"
         timestamp: "{{ ansible_date_time.iso8601 }}"
     per_host: false
 
@@ -51,6 +60,8 @@
       - "════════════════════════════════════════════"
       - "Variable: {{ task_key_clean }}"
       - "Task ID: {{ final_stats.task_id }}"
+      - "Origen: {{ final_stats.source_server }}"
+      - "Destino: {{ final_stats.target_server }}"
       - "Modo: {{ 'Solo Análisis' if not (file_sync_execute_copy | bool) else 'Análisis + Sincronización' }}"
       - "Status: {{ 'success' if (not sync_metrics.sync_required or (sync_status.completed | default(false)))
         else 'analysis_only' if not (file_sync_execute_copy | bool) else 'failed' }}"
