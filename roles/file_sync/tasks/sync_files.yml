@@ -75,7 +75,6 @@
           - "║ Total archivos sincronizados:     {{ sync_metrics.files_to_sync }}"
           - "╠═══════════════════════════════════════════════════════════════"
           - "║ RESULTADO: {{ 'EXITOSO' if sync_status.success else 'FALLÓ' }}"
-          - "║ Código de retorno: {{ sync_status.return_code }}"
           - "║ Mensaje: {{ sync_status.message }}"
           - "╚═══════════════════════════════════════════════════════════════"
 
