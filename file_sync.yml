@@ -85,14 +85,13 @@
               {%- if sync_patterns.startswith('[') and sync_patterns.endswith(']') -%}
                 {{ sync_patterns | from_json }}
               {%- else -%}
-                {{ [sync_patterns] }}
+              {{ \[sync_patterns] }}
               {%- endif -%}
-            {%- else -%}
+              {%- else -%}
               {{ sync_patterns }}
             {%- endif -%}
           {%- else -%}
-            []
-          {%- endif -%}
+          [] {%- endif -%}
 
     - name: "Mostrar resumen de validación"
       ansible.builtin.debug:
