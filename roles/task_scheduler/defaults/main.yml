@@ -1,0 +1,15 @@
+---
+# defaults file for roles/task_scheduler
+
+# Configuración de la tarea programada
+task_scheduler_task_name: "Bizagi_Robocopy_Task"
+task_scheduler_script_path: "C:\\temp\\script_Bizagi\\robocopy_Bizagi.ps1"
+
+# Estado deseado
+task_scheduler_should_enable: false
+task_scheduler_server_role: "unknown"
+task_scheduler_active_environment: "unknown"
+
+# Configuración de validación
+task_scheduler_validate_script: true
+task_scheduler_show_details: true

@@ -1,0 +1,73 @@
+---
+# Play 1: Validaciones
+- name: "Validaciones para Gestión de Tareas Programadas"
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: "(INFORMATIVO) - Validar parámetros requeridos"
+      ansible.builtin.assert:
+        that:
+          - active_environment is defined
+          - active_environment in ['produccion', 'contingencia']
+          - prod_server is defined
+          - cont_server is defined
+          - prod_server != cont_server
+        fail_msg: |
+          ERROR: Parámetros inválidos:
+          - active_environment: debe ser 'produccion' o 'contingencia'
+          - prod_server y cont_server: deben estar definidos y ser diferentes
+          - Actual: active_environment={{ active_environment | default('NO DEFINIDO') }}
+        success_msg: "OK: Configuración {{ active_environment }} - {{ prod_server }} ↔ {{ cont_server }}"
+
+    - name: "(INFORMATIVO) - Validar que ambos servidores existen en inventario"
+      ansible.builtin.assert:
+        that:
+          - prod_server in groups['all']
+          - cont_server in groups['all']
+        fail_msg: |
+          ERROR: Servidores no encontrados en inventario:
+          - {{ prod_server }}: {{ 'OK' if prod_server in groups['all'] else 'NO ENCONTRADO' }}
+          - {{ cont_server }}: {{ 'OK' if cont_server in groups['all'] else 'NO ENCONTRADO' }}
+          - Disponibles: {{ groups['all'] | join(', ') }}
+        success_msg: "OK: Ambos servidores encontrados en inventario"
+
+    - name: "Mostrar configuración de la tarea"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "CONFIGURACIÓN DE TAREA PROGRAMADA"
+          - "════════════════════════════════════════════"
+          - "Ambiente activo: {{ active_environment | upper }}"
+          - "Servidor Prod: {{ prod_server }}"
+          - "Servidor Cont: {{ cont_server }}"
+          - "────────────────────────────────────────────"
+          - "{{ prod_server + ': ACTIVO' if active_environment == 'produccion' else prod_server + ': INACTIVO' }}"
+          - "{{ cont_server + ': ACTIVO' if active_environment == 'contingencia' else cont_server + ': INACTIVO' }}"
+          - "════════════════════════════════════════════"
+
+# Play 2: Gestión en ambos servidores
+- name: "Gestión de Tareas Programadas"
+  hosts: "{{ windows_servers | default([]) }}"
+  gather_facts: true
+  serial: 1
+
+  vars:
+    task_name: "{{ custom_task_name | default('robocopy_bizagi') }}"
+    script_path: "C:\\temp\\script_Bizagi\\robocopy_Bizagi.ps1"
+    should_be_enabled: >-
+      {{
+        (inventory_hostname == prod_server and active_environment == 'produccion') or
+        (inventory_hostname == cont_server and active_environment == 'contingencia')
+      }}
+
+  tasks:
+    - name: "Ejecutar gestión de tarea programada"
+      ansible.builtin.include_role:
+        name: task_scheduler
+      vars:
+        task_scheduler_task_name: "{{ task_name }}"
+        task_scheduler_script_path: "{{ script_path }}"
+        task_scheduler_should_enable: "{{ should_be_enabled }}"
+        task_scheduler_server_role: "{{ 'produccion' if inventory_hostname == prod_server else 'contingencia' }}"
+        task_scheduler_active_environment: "{{ active_environment }}"

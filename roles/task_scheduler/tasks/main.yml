@@ -1,0 +1,25 @@
+---
+# tasks file for roles/task_scheduler
+- name: "Mostrar configuración del servidor"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════"
+      - "SERVIDOR: {{ inventory_hostname | upper }}"
+      - "════════════════════════════════════════════"
+      - "Rol: {{ task_scheduler_server_role | upper }}"
+      - "Tarea: {{ task_scheduler_task_name }}"
+      - "Script: {{ task_scheduler_script_path }}"
+      - "Estado deseado: {{ 'HABILITADA' if task_scheduler_should_enable else 'DESHABILITADA' }}"
+      - "════════════════════════════════════════════"
+
+- name: "Validar tarea y script"
+  ansible.builtin.include_tasks: validate_task.yml
+  tags: [validation, always]
+
+- name: "Gestionar estado de la tarea"
+  ansible.builtin.include_tasks: manage_task.yml
+  tags: [management, always]
+
+- name: "Generar reporte final"
+  ansible.builtin.include_tasks: generate_report.yml
+  tags: [report, always]
