@@ -1,20 +1,5 @@
 ---
 # tasks/validate_task.yml
-- name: "Verificar que el script existe"
-  ansible.windows.win_stat:
-    path: "{{ task_scheduler_script_path }}"
-  register: script_check
-  when: task_scheduler_validate_script
-
-- name: "Validar existencia del script"
-  ansible.builtin.assert:
-    that:
-      - script_check.stat.exists
-      - script_check.stat.isreg
-    fail_msg: "Script no encontrado: {{ task_scheduler_script_path }}"
-    success_msg: "OK: Script encontrado"
-  when: task_scheduler_validate_script
-
 - name: "Obtener información de la tarea programada"
   community.windows.win_scheduled_task_stat:
     name: "{{ task_scheduler_task_name }}"
