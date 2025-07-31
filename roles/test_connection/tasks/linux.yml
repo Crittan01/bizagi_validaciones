@@ -2,7 +2,7 @@
 # tasks file/linux.yml for roles/test_connection
 - name: "Ejecutar test de conectividad Linux"
   block:
-    - name: "Test conectividad [{{ test_connection_check_type | capitalize }}]"
+    - name: "Test conectividad [{{ test_connection_check_types | capitalize }}]"
       ansible.builtin.shell: "{{ lookup('template', 'test_connection_linux.sh.j2') }}"
       register: connectivity_test
       retries: "{{ test_connection_retries }}"

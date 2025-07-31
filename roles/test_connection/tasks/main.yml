@@ -7,9 +7,9 @@
       - "TAREA {{ test_connection_task_id }}: {{ test_connection_task_description }}"
       - "===================================="
       - "Desde: {{ inventory_hostname }}"
-      - "Tipo: {{ test_connection_check_type }}"
+      - "Tipo: {{ test_connection_check_types }}"
       - "Destinos: {{ test_connection_target_hosts | join(', ') }}"
-      - "Puertos: {{ (test_connection_check_type in ['telnet', 'ambos']) | ternary(test_connection_ports | join(', '), 'N/A') }}"
+      - "Puertos: {{ (test_connection_check_types in ['telnet', 'ambos']) | ternary(test_connection_ports | join(', '), 'N/A') }}"
       - "===================================="
 
 - name: Ejecutar Test Windows
