@@ -18,8 +18,8 @@
           - source_server != target_server
         fail_msg: |
           ERROR: Debes definir servidores origen y destino válidos:
-          - source_server: Servidor origen (ej: windows_prod)
-          - target_server: Servidor destino (ej: windows_cont)
+          - source_server: Servidor origen (ej: SADGVBPMAPP1, SADGVBPMAPP2)
+          - target_server: Servidor destino (ej: CCMVBPMAPP)
           - Deben ser diferentes entre sí
           - Origen actual: "{{ source_server | default('NO DEFINIDO') }}"
           - Destino actual: "{{ target_server | default('NO DEFINIDO') }}"
@@ -32,8 +32,9 @@
         fail_msg: |
           ERROR: El servidor origen no existe en el inventario:
           - Servidor buscado: "{{ source_server }}"
-          - Servidores disponibles: {{ groups['all'] | join(', ') }}
-        success_msg: "OK: Servidor origen encontrado en inventario"
+          - Servidores Bizagi disponibles: {{ groups['windows_servers'] | default([]) | join(', ') }}
+          - Servidores completos: {{ groups['all'] | join(', ') }}
+        success_msg: "OK: Servidor origen {{ source_server }} encontrado en inventario"
 
     - name: "(INFORMATIVO) - Validar que servidor destino existe en inventario"
       ansible.builtin.assert:
@@ -42,20 +43,40 @@
         fail_msg: |
           ERROR: El servidor destino no existe en el inventario:
           - Servidor buscado: "{{ target_server }}"
-          - Servidores disponibles: {{ groups['all'] | join(', ') }}
-        success_msg: "OK: Servidor destino encontrado en inventario"
+          - Servidores Bizagi disponibles: {{ groups['windows_servers'] | default([]) | join(', ') }}
+          - Servidores completos: {{ groups['all'] | join(', ') }}
+        success_msg: "OK: Servidor destino {{ target_server }} encontrado en inventario"
 
-    - name: "(INFORMATIVO) - Validar que ambos servidores sean Windows"
+    - name: "(INFORMATIVO) - Validar que ambos servidores sean Bizagi Windows"
       ansible.builtin.assert:
         that:
           - source_server in groups['windows_servers'] | default([])
           - target_server in groups['windows_servers'] | default([])
         fail_msg: |
-          ERROR: Ambos servidores deben ser parte del grupo Windows:
+          ERROR: Ambos servidores deben ser parte de la infraestructura Bizagi Windows:
           - Origen {{ source_server }}: {{ 'OK' if source_server in groups['windows_servers'] | default([]) else 'NO está en windows_servers' }}
           - Destino {{ target_server }}: {{ 'OK' if target_server in groups['windows_servers'] | default([]) else 'NO está en windows_servers' }}
-          - Servidores Windows disponibles: {{ groups['windows_servers'] | default([]) | join(', ') }}
-        success_msg: "OK: Ambos servidores son Windows válidos"
+          - Servidores Bizagi disponibles: {{ groups['windows_servers'] | default([]) | join(', ') }}
+          - Servidores Producción: {{ groups['windows_produccion'] | default([]) | join(', ') }}
+          - Servidores Contingencia: {{ groups['windows_contingencia'] | default([]) | join(', ') }}
+        success_msg: "OK: Ambos servidores son parte de la infraestructura Bizagi válida"
+
+    - name: "(INFORMATIVO) - Mostrar información de roles de servidores"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "INFORMACIÓN DE SERVIDORES BIZAGI"
+          - "════════════════════════════════════════════"
+          - "Servidor Origen: {{ source_server }}"
+          - "  - Role: {{ hostvars[source_server]['server_role'] | default('N/A') }}"
+          - "  - App Instance: {{ hostvars[source_server]['app_instance'] | default('N/A') }}"
+          - "  - IP: {{ hostvars[source_server]['ansible_host'] | default('N/A') }}"
+          - "────────────────────────────────────────────"
+          - "Servidor Destino: {{ target_server }}"
+          - "  - Role: {{ hostvars[target_server]['server_role'] | default('N/A') }}"
+          - "  - App Instance: {{ hostvars[target_server]['app_instance'] | default('N/A') }}"
+          - "  - IP: {{ hostvars[target_server]['ansible_host'] | default('N/A') }}"
+          - "════════════════════════════════════════════"
 
     - name: "(INFORMATIVO) - Validar estructura de ruta Windows"
       ansible.builtin.assert:
@@ -77,7 +98,7 @@
           - Ruta actual: "{{ sync_path | default('NO DEFINIDA') }}"
         success_msg: "OK: Ruta Windows válida: {{ sync_path }}"
 
-    - name: "Procesar patrones correctamente"
+    - name: "Procesar patrones de archivos correctamente"
       ansible.builtin.set_fact:
         sync_patterns_processed: >-
           {%- if sync_patterns is defined -%}
@@ -98,27 +119,40 @@
       ansible.builtin.debug:
         msg:
           - "════════════════════════════════════════════"
-          - "VALIDACIONES COMPLETADAS"
+          - "VALIDACIONES COMPLETADAS - BIZAGI SYNC"
           - "════════════════════════════════════════════"
-          - "Origen: {{ source_server }}"
-          - "Destino: {{ target_server }}"
+          - "Origen: {{ source_server }} ({{ hostvars[source_server]['server_role'] | default('N/A') }})"
+          - "Destino: {{ target_server }} ({{ hostvars[target_server]['server_role'] | default('N/A') }})"
           - "Ruta: {{ sync_path }}"
           - "Patrones: {{ sync_patterns_processed | join(', ') }}"
           - "Tipo patrones: {{ sync_patterns_processed | type_debug }}"
           - "Dirección: {{ source_server }} → {{ target_server }}"
           - "════════════════════════════════════════════"
 
-# Play 2: Ejecución del rol en servidor origen
-- name: "Sincronización de Archivos Específicos"
+# Play 2: Ejecución del rol en servidor origen específico
+- name: "Sincronización de Archivos"
   hosts: "{{ source_server | default([]) }}"
   gather_facts: true
 
   vars:
     sync_task_id: "{{ custom_sync_task_id | default('sync_0.3') }}"
-    sync_description: "{{ custom_sync_description | default('Sincronización Específica') }}"
+    sync_description: "{{ custom_sync_description | default('Bizagi - Sincronización de Archivos') }}"
 
   tasks:
-    - name: "Ejecutar sincronización"
+    - name: "Mostrar contexto del servidor actual"
+      ansible.builtin.debug:
+        msg:
+          - "════════════════════════════════════════════"
+          - "CONTEXTO DEL SERVIDOR DE EJECUCIÓN"
+          - "════════════════════════════════════════════"
+          - "Servidor: {{ inventory_hostname }}"
+          - "Role: {{ server_role | default('N/A') }}"
+          - "App Instance: {{ app_instance | default('N/A') }}"
+          - "IP: {{ ansible_host }}"
+          - "OS: {{ ansible_os_family | default('Detectando...') }}"
+          - "════════════════════════════════════════════"
+
+    - name: "Ejecutar sincronización de archivos Bizagi"
       ansible.builtin.include_role:
         name: file_sync
       vars:
