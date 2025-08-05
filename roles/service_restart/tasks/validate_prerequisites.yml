@@ -1,0 +1,55 @@
+---
+# tasks/validate_prerequisites.yml
+- name: "Validar que es servidor Windows"
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == 'Windows'
+    fail_msg: "Este rol solo funciona en servidores Windows"
+    success_msg: "OK: Servidor Windows detectado"
+
+- name: "Verificar conectividad WinRM"
+  ansible.windows.win_ping:
+  register: winrm_connectivity
+
+- name: "Validar existencia de servicios"
+  ansible.windows.win_service:
+    name: "{{ item }}"
+  register: service_check
+  loop: "{{ service_restart_service_names }}"
+  failed_when: false
+
+- name: "Procesar resultados de validación de servicios"
+  ansible.builtin.set_fact:
+    existing_services: >-
+      {{ service_check.results | selectattr('exists', 'equalto', true) | map(attribute='name') | list }}
+    missing_services: >-
+      {{ service_check.results | selectattr('exists', 'equalto', false) | map(attribute='name') | list }}
+
+- name: "Mostrar servicios encontrados"
+  ansible.builtin.debug:
+    msg:
+      - "════════════════════════════════════════════"
+      - "VALIDACIÓN DE SERVICIOS"
+      - "════════════════════════════════════════════"
+      - "Servicios SI existentes: {{ existing_services | length }}"
+      - "{% for service in existing_services %} {{ service }}{% endfor %}"
+      - "────────────────────────────────────────────"
+      - "Servicios NO encontrados: {{ missing_services | length }}"
+      - "{% for service in missing_services %} {{ service }}{% endfor %}"
+      - "════════════════════════════════════════════"
+
+- name: "Advertir sobre servicios faltantes"
+  ansible.builtin.debug:
+    msg:
+      - "ADVERTENCIA: Algunos servicios no existen"
+      - "Servicios faltantes: {{ missing_services | join(', ') }}"
+      - "Solo se procesarán los servicios existentes"
+  when: missing_services | length > 0
+
+- name: "Fallar si no hay servicios válidos"
+  ansible.builtin.fail:
+    msg: |
+      ERROR: Ninguno de los servicios especificados existe:
+      - Servicios solicitados: {{ service_restart_service_names | join(', ') }}
+      - Servicios faltantes: {{ missing_services | join(', ') }}
+  when: existing_services | length == 0

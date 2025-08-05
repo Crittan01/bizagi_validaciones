@@ -1,0 +1,21 @@
+---
+# vars file for roles/cards
+cards_google_chat:
+  webhook_url: >-
+    https://chat.googleapis.com/v1/spaces/AAQA78mQWKI/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=ibxd4IXb4HJw3Gx3vCk7pQYKm21kRUgZYi8IKsdune0
+
+  icons:
+    success: "STAR"
+    failed: "REPORT_PROBLEM"
+    running: "CLOCK"
+    warning: "EMAIL"
+
+cards_teams_chat:
+  webhook_url: ""
+  colors:
+    success: "00FF00"
+    failed: "FF0000"
+    running: "FFA500"
+    warning: "FFFF00"
+  urls:
+    ansible_logo: "https://raw.githubusercontent.com/ansible/logos/main/ansible-logos/Ansible-Mark-RGB_Black.png"

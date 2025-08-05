@@ -98,22 +98,10 @@
           - Ruta actual: "{{ sync_path | default('NO DEFINIDA') }}"
         success_msg: "OK: Ruta Windows válida: {{ sync_path }}"
 
-    - name: "Procesar patrones de archivos correctamente"
-      ansible.builtin.set_fact:
-        sync_patterns_processed: >-
-          {%- if sync_patterns is defined -%}
-            {%- if sync_patterns is string -%}
-              {%- if sync_patterns.startswith('[') and sync_patterns.endswith(']') -%}
-                {{ sync_patterns | from_json }}
-          {%- else -%}
-                {{ [sync_patterns] }}
-          {%- endif -%}
-            {%- else -%}
-              {{ sync_patterns }}
-          {%- endif -%}
-          {%- else -%}
-            []
-          {%- endif -%}
+    - name: Procesar patrón
+      ansible.builtin.debug:
+        msg: "Patrón actual: {{ item }}"
+      loop: "{{ sync_patterns }}"
 
     - name: "Mostrar resumen de validación"
       ansible.builtin.debug:
@@ -124,8 +112,8 @@
           - "Origen: {{ source_server }} ({{ hostvars[source_server]['server_role'] | default('N/A') }})"
           - "Destino: {{ target_server }} ({{ hostvars[target_server]['server_role'] | default('N/A') }})"
           - "Ruta: {{ sync_path }}"
-          - "Patrones: {{ sync_patterns_processed | join(', ') }}"
-          - "Tipo patrones: {{ sync_patterns_processed | type_debug }}"
+          - "Patrones: {{ sync_patterns | join(', ') }}"
+          - "Tipo patrones: {{ sync_patterns | type_debug }}"
           - "Dirección: {{ source_server }} → {{ target_server }}"
           - "════════════════════════════════════════════"
 
@@ -161,5 +149,5 @@
         file_sync_source_server: "{{ source_server }}"
         file_sync_target_server: "{{ target_server }}"
         file_sync_comparison_path: "{{ sync_path }}"
-        file_sync_file_patterns: "{{ hostvars['localhost']['sync_patterns_processed'] }}"
+        file_sync_file_patterns: "{{ hostvars['localhost']['sync_patterns'] }}"
         file_sync_execute_copy: "{{ enable_sync | default(false) }}"

@@ -1,0 +1,6 @@
+---
+# tasks file for roles/cards
+- name: Include Google Chat notifications
+  ansible.builtin.include_tasks: google_chat.yml
+  when:
+    - cards_notification_platform == "google_chat"
