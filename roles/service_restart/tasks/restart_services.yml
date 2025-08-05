@@ -45,7 +45,7 @@
             'initial_state': services_initial_state[result.name].state,
             'final_state': final_state.state,
             'state_changed': services_initial_state[result.name].state != final_state.state,
-            'is_running': final_state.state == 'started'
+            'is_running': final_state.state == 'running'
           }
         }) -%}
       {%- endfor -%}
@@ -76,7 +76,7 @@
   ansible.builtin.debug:
     msg:
       - "═════════════════════════════════════════"
-      - "❌ SERVICIOS CON ERRORES"
+      - "SERVICIOS CON ERRORES"
       - "═════════════════════════════════════════"
       - "{% for service, details in restart_results.items() %}{% if not details.restart_success %}{{ service }}:
         {{ details.restart_error }}{% endif %}{% endfor %}"
